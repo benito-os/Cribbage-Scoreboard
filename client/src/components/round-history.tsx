@@ -140,11 +140,15 @@ export function RoundHistory({ rounds, players, maxHeight = "300px" }: RoundHist
                         const tricks = round.playerTricks?.[player.id] ?? 0;
                         const scoreChange = round.scoreChanges?.[player.id] ?? 0;
                         const isBidder = player.id === round.bidderId;
+                        const isFolded = round.playerParticipation?.[player.id] === "fold";
 
                         return (
                           <div
                             key={player.id}
-                            className="flex items-center justify-between text-sm"
+                            className={cn(
+                              "flex items-center justify-between text-sm",
+                              isFolded && "opacity-60"
+                            )}
                           >
                             <span className={cn(
                               "truncate",
@@ -155,7 +159,7 @@ export function RoundHistory({ rounds, players, maxHeight = "300px" }: RoundHist
                             </span>
                             <div className="flex items-center gap-3">
                               <span className="text-muted-foreground tabular-nums">
-                                {tricks} trick{tricks !== 1 ? "s" : ""}
+                                {isFolded ? "Folded" : `${tricks} trick${tricks !== 1 ? "s" : ""}`}
                               </span>
                               <span className={cn(
                                 "font-medium tabular-nums w-12 text-right",
