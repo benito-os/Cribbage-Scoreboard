@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import type { GameState, Player, HandResult, Card, ScoreEntry, GamePhase } from "@shared/schema";
-import { getTargetScore, getSkunkStatus } from "@shared/schema";
+import { getTargetScore, getSkunkStatus, checkHisHeels } from "@shared/schema";
 
 const STORAGE_KEY = "cribbage-game-state";
 
@@ -116,12 +116,38 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const setStarterCard = useCallback((card: Card) => {
     setGameState(prev => {
       if (!prev) return null;
+      
+      // Check for His Heels - if starter is a Jack, dealer gets 2 points
+      let updatedPlayers = prev.players;
+      let hisHeelsAwarded = false;
+      
+      if (checkHisHeels(card)) {
+        const dealerId = prev.players[prev.currentDealerIndex].id;
+        updatedPlayers = prev.players.map(player => {
+          if (player.id === dealerId) {
+            return { ...player, score: player.score + 2 };
+          }
+          return player;
+        });
+        hisHeelsAwarded = true;
+      }
+      
+      // Check for winner after His Heels
+      const winners = updatedPlayers.filter(p => p.score >= prev.targetScore);
+      const winner = winners.length > 0 
+        ? winners.reduce((a, b) => a.score >= b.score ? a : b)
+        : null;
+      
       return {
         ...prev,
+        players: updatedPlayers,
         currentHand: {
           ...prev.currentHand,
           starterCard: card,
+          hisHeelsAwarded,
         },
+        gamePhase: winner ? "complete" : prev.gamePhase,
+        winnerId: winner?.id,
       };
     });
   }, []);

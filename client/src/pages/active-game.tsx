@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 export default function ActiveGame() {
   const { 
     gameState, 
+    setStarterCard,
     submitPeggingScores, 
     submitHandScore, 
     submitCribScore, 
@@ -247,12 +248,29 @@ export default function ActiveGame() {
 
           {gamePhase === "counting" && (
             <Card className="p-4 space-y-4">
-              <div>
-                <h3 className="font-medium mb-1">Counting Phase</h3>
-                <p className="text-sm text-muted-foreground">
-                  Score each hand, then the crib
-                </p>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-medium mb-1">Counting Phase</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Score each hand, then the crib
+                  </p>
+                </div>
+                {currentHand?.starterCard && (
+                  <div className="text-center">
+                    <div className="text-xs text-muted-foreground mb-1">Starter</div>
+                    <Badge variant="secondary" className="text-sm">
+                      {currentHand.starterCard.rank}{currentHand.starterCard.suit[0].toUpperCase()}
+                    </Badge>
+                  </div>
+                )}
               </div>
+
+              {currentHand?.hisHeelsAwarded && (
+                <div className="flex items-center gap-2 p-2 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-sm">
+                  <Crown className="h-4 w-4" />
+                  <span>His Heels! {currentDealer?.name} scores 2 for the Jack</span>
+                </div>
+              )}
 
               <div className="space-y-2">
                 {players
@@ -417,6 +435,7 @@ export default function ActiveGame() {
           starterCard={currentHand?.starterCard}
           onSubmit={handleScoreSubmit}
           existingHandCards={currentHand?.handScores?.flatMap(s => s.cards ?? []) ?? []}
+          onStarterCardSet={setStarterCard}
         />
       )}
 

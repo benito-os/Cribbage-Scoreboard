@@ -28,6 +28,7 @@ interface ScoreEntryDialogProps {
   starterCard?: Card;
   onSubmit: (entry: ScoreEntry) => void;
   existingHandCards?: Card[];
+  onStarterCardSet?: (card: Card) => void;
 }
 
 export function ScoreEntryDialog({
@@ -39,6 +40,7 @@ export function ScoreEntryDialog({
   starterCard: initialStarter,
   onSubmit,
   existingHandCards = [],
+  onStarterCardSet,
 }: ScoreEntryDialogProps) {
   const [mode, setMode] = useState<"calculated" | "manual">("calculated");
   const [handCards, setHandCards] = useState<Card[]>([]);
@@ -74,6 +76,11 @@ export function ScoreEntryDialog({
 
   const handleSubmit = () => {
     if (mode === "calculated" && handCards.length === 4) {
+      // If we're setting a new starter card (wasn't provided initially), save it globally
+      if (!initialStarter && starterCard && onStarterCardSet) {
+        onStarterCardSet(starterCard);
+      }
+      
       const entry: ScoreEntry = {
         playerId,
         points: displayScore,

@@ -86,6 +86,7 @@ export const gameStateSchema = z.object({
     peggingScores: z.record(z.string(), z.number()).optional(),
     handScores: z.array(scoreEntrySchema).optional(),
     cribScore: scoreEntrySchema.optional(),
+    hisHeelsAwarded: z.boolean().optional(),
   }).optional(),
   winnerId: z.string().optional(),
 });
@@ -286,23 +287,23 @@ export function calculateHandScore(
     pairsByRank.get(rank)!.push(pair);
   }
   
-  for (const [rank, rankPairs] of pairsByRank) {
+  pairsByRank.forEach((rankPairs, rank) => {
     if (rankPairs.length === 6) {
       // Four of a kind (6 pairs = 12 points)
-      const allCards = [...new Set(rankPairs.flat())];
+      const uniqueCards = Array.from(new Set(rankPairs.flat()));
       items.push({
         type: "fourOfKind",
         points: 12,
-        cards: allCards,
+        cards: uniqueCards,
         description: `Four ${rank}s for 12`,
       });
     } else if (rankPairs.length === 3) {
       // Three of a kind (3 pairs = 6 points)
-      const allCards = [...new Set(rankPairs.flat())];
+      const uniqueCards = Array.from(new Set(rankPairs.flat()));
       items.push({
         type: "threeOfKind",
         points: 6,
-        cards: allCards,
+        cards: uniqueCards,
         description: `Three ${rank}s for 6`,
       });
     } else {
@@ -316,7 +317,7 @@ export function calculateHandScore(
         });
       }
     }
-  }
+  });
   
   // Runs (1 point per card)
   const runs = findRuns(allCards);
