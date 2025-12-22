@@ -1,6 +1,6 @@
 import { useTheme } from "./theme-provider";
 import casinoBg from "@assets/generated_images/luxury_casino_felt_texture.png";
-import badgersBg from "@assets/generated_images/wisconsin_badgers_red_background.png";
+import badgersLogo from "@assets/generated_images/badgers_w_logo_style.png";
 
 export function ThemedBackground() {
   const { theme } = useTheme();
@@ -9,13 +9,34 @@ export function ThemedBackground() {
     return null;
   }
 
-  const bgImage = theme === "casino" ? casinoBg : badgersBg;
+  if (theme === "casino") {
+    return (
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ 
+          backgroundImage: `url(${casinoBg})`,
+          zIndex: -1,
+        }}
+        aria-hidden="true"
+      />
+    );
+  }
 
-  return (
-    <div
-      className="fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat opacity-30"
-      style={{ backgroundImage: `url(${bgImage})` }}
-      aria-hidden="true"
-    />
-  );
+  if (theme === "badgers") {
+    return (
+      <div
+        className="fixed inset-0 flex items-center justify-center"
+        style={{ zIndex: -1 }}
+        aria-hidden="true"
+      >
+        <img 
+          src={badgersLogo} 
+          alt="" 
+          className="w-80 h-80 opacity-15"
+        />
+      </div>
+    );
+  }
+
+  return null;
 }

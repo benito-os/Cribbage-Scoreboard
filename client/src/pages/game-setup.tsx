@@ -58,7 +58,7 @@ export default function GameSetup() {
           </div>
           <h1 className="text-4xl font-bold tracking-tight mb-2">Pepper</h1>
           <p className="text-muted-foreground">
-            The classic Midwestern trick-taking card game
+            The classic Hanson family game
           </p>
         </div>
 
