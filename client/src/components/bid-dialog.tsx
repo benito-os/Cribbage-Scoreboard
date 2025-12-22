@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { SuitIcon } from "./suit-icon";
 import type { Player, TrumpSuit, BidType } from "@shared/schema";
 import { getMaxBid, getPepperBid } from "@shared/schema";
-import { Flame, Check } from "lucide-react";
+import { Flame, Check, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BidDialogProps {
@@ -25,6 +25,7 @@ interface BidDialogProps {
 
 type Suit = "spades" | "hearts" | "diamonds" | "clubs";
 const suits: Suit[] = ["spades", "hearts", "diamonds", "clubs"];
+const trumpOptions: TrumpSuit[] = ["spades", "hearts", "diamonds", "clubs", "none"];
 
 export function BidDialog({
   open,
@@ -59,23 +60,17 @@ export function BidDialog({
     setBidType("standard");
   };
 
-  const handlePepperSelect = (type: "pepper" | "pepperNo") => {
-    setBidType(type);
+  const handlePepperSelect = () => {
+    setBidType("pepper");
     setBidAmount(pepperBid);
-    
-    // For Pepper No, auto-submit immediately
-    if (type === "pepperNo" && bidderId) {
-      onSubmit(bidderId, pepperBid, type, "none");
-      onClose();
-    }
   };
 
-  const handleTrumpSelect = (suit: Suit) => {
-    // Auto-submit when trump is selected (for standard and pepper bids)
+  const handleTrumpSelect = (trumpSuit: TrumpSuit) => {
+    // Auto-submit when trump is selected
     if (!bidderId) return;
     
     const finalAmount = bidType === "standard" ? (bidAmount || 1) : pepperBid;
-    onSubmit(bidderId, finalAmount, bidType, suit);
+    onSubmit(bidderId, finalAmount, bidType, trumpSuit);
     onClose();
   };
 
@@ -86,8 +81,8 @@ export function BidDialog({
   // Generate bid buttons 1 to maxBid
   const bidOptions = Array.from({ length: maxBid }, (_, i) => i + 1);
 
-  // Show trump selection only after bid is selected (not Pepper No)
-  const showTrumpSelection = bidAmount !== null && bidType !== "pepperNo";
+  // Show trump selection after bid is selected
+  const showTrumpSelection = bidAmount !== null;
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -147,35 +142,20 @@ export function BidDialog({
               ))}
             </div>
             
-            {/* Pepper bids row */}
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <Button
-                type="button"
-                variant={bidType === "pepper" ? "default" : "outline"}
-                onClick={() => handlePepperSelect("pepper")}
-                className={cn(
-                  "h-14 text-base gap-2",
-                  bidType === "pepper" && "ring-2 ring-primary ring-offset-2"
-                )}
-                data-testid="button-bid-pepper"
-              >
-                <Flame className="h-5 w-5" />
-                Pepper ({pepperBid})
-              </Button>
-              <Button
-                type="button"
-                variant={bidType === "pepperNo" ? "default" : "outline"}
-                onClick={() => handlePepperSelect("pepperNo")}
-                className={cn(
-                  "h-14 text-base gap-2",
-                  bidType === "pepperNo" && "ring-2 ring-primary ring-offset-2"
-                )}
-                data-testid="button-bid-pepperno"
-              >
-                <Flame className="h-5 w-5" />
-                Pepper No ({pepperBid})
-              </Button>
-            </div>
+            {/* Pepper bid button */}
+            <Button
+              type="button"
+              variant={bidType === "pepper" ? "default" : "outline"}
+              onClick={handlePepperSelect}
+              className={cn(
+                "h-14 text-base gap-2 w-full mt-2",
+                bidType === "pepper" && "ring-2 ring-primary ring-offset-2"
+              )}
+              data-testid="button-bid-pepper"
+            >
+              <Flame className="h-5 w-5" />
+              Pepper ({pepperBid})
+            </Button>
           </div>
 
           {/* Trump Suit Selection - Large buttons, auto-submits on tap */}
@@ -184,18 +164,24 @@ export function BidDialog({
               <Label className="text-sm text-muted-foreground">
                 Tap trump suit to confirm
               </Label>
-              <div className="grid grid-cols-4 gap-2">
-                {suits.map((suit) => (
+              <div className="grid grid-cols-5 gap-2">
+                {trumpOptions.map((trumpSuit) => (
                   <Button
-                    key={suit}
+                    key={trumpSuit}
                     type="button"
                     variant="outline"
-                    onClick={() => handleTrumpSelect(suit)}
+                    onClick={() => handleTrumpSelect(trumpSuit)}
                     className="h-16 flex flex-col gap-1"
-                    data-testid={`button-trump-${suit}`}
+                    data-testid={`button-trump-${trumpSuit}`}
                   >
-                    <SuitIcon suit={suit} size="lg" />
-                    <span className="text-xs capitalize">{suit}</span>
+                    {trumpSuit === "none" ? (
+                      <Ban className="h-6 w-6 text-muted-foreground" />
+                    ) : (
+                      <SuitIcon suit={trumpSuit} size="lg" />
+                    )}
+                    <span className="text-xs capitalize">
+                      {trumpSuit === "none" ? "No Trump" : trumpSuit}
+                    </span>
                   </Button>
                 ))}
               </div>
@@ -203,7 +189,7 @@ export function BidDialog({
           )}
 
           {/* Instructions */}
-          {!showTrumpSelection && bidType !== "pepperNo" && (
+          {!showTrumpSelection && (
             <p className="text-center text-sm text-muted-foreground py-2">
               Select a bid amount to continue
             </p>

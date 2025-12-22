@@ -4,8 +4,8 @@ import { z } from "zod";
 export const trumpSuits = ["spades", "hearts", "diamonds", "clubs", "none"] as const;
 export type TrumpSuit = typeof trumpSuits[number];
 
-// Bid types
-export const bidTypes = ["standard", "pepper", "pepperNo"] as const;
+// Bid types (pepperNo removed - any bid can be no trump now)
+export const bidTypes = ["standard", "pepper"] as const;
 export type BidType = typeof bidTypes[number];
 
 // Player schema

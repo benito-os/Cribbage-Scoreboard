@@ -33,6 +33,7 @@ import {
   ArrowUpDown,
   CircleDot,
   X,
+  Ban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -65,7 +66,7 @@ export default function ActiveGame() {
   const handleBidSubmit = (
     bidderId: string,
     amount: number,
-    type: "standard" | "pepper" | "pepperNo",
+    type: "standard" | "pepper",
     trumpSuit: "spades" | "hearts" | "diamonds" | "clubs" | "none"
   ) => {
     submitBid(bidderId, amount, type, trumpSuit);
@@ -100,7 +101,6 @@ export default function ActiveGame() {
 
   const getBidLabel = () => {
     if (!currentBid) return "";
-    if (currentBid.type === "pepperNo") return "Pepper No";
     if (currentBid.type === "pepper") return "Pepper";
     return `Bid ${currentBid.amount}`;
   };
@@ -228,7 +228,9 @@ export default function ActiveGame() {
                     </p>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <span>{getBidLabel()}</span>
-                      {currentBid.trumpSuit && currentBid.trumpSuit !== "none" && (
+                      {currentBid.trumpSuit === "none" ? (
+                        <Ban className="h-4 w-4" />
+                      ) : currentBid.trumpSuit && (
                         <SuitIcon suit={currentBid.trumpSuit} size="sm" />
                       )}
                     </div>

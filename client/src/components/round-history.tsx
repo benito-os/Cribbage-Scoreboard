@@ -4,7 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SuitIcon } from "./suit-icon";
 import type { Round, Player } from "@shared/schema";
 import { cn } from "@/lib/utils";
-import { Check, X, CircleDot, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, X, CircleDot, ChevronDown, ChevronUp, Ban } from "lucide-react";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -20,7 +20,6 @@ export function RoundHistory({ rounds, players, maxHeight = "300px" }: RoundHist
   const getPlayerName = (id: string) => players.find(p => p.id === id)?.name ?? "Unknown";
 
   const getBidLabel = (round: Round) => {
-    if (round.bidType === "pepperNo") return "Pepper No";
     if (round.bidType === "pepper") return "Pepper";
     return round.bidAmount.toString();
   };
@@ -92,7 +91,9 @@ export function RoundHistory({ rounds, players, maxHeight = "300px" }: RoundHist
                         </span>
                         <Badge variant="secondary" className="gap-1">
                           {getBidLabel(round)}
-                          {round.trumpSuit !== "none" && (
+                          {round.trumpSuit === "none" ? (
+                            <Ban className="h-3 w-3 text-muted-foreground" />
+                          ) : (
                             <SuitIcon suit={round.trumpSuit} size="sm" />
                           )}
                         </Badge>

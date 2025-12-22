@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { SuitIcon } from "./suit-icon";
 import type { GameState, PlayerTricks } from "@shared/schema";
 import { calculateAllScoreChanges, getMaxTricks, getPepperBid } from "@shared/schema";
-import { Minus, Plus, Check, X } from "lucide-react";
+import { Minus, Plus, Check, X, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface RoundResultDialogProps {
@@ -137,7 +137,6 @@ export function RoundResultDialog({
   };
 
   const getBidLabel = () => {
-    if (currentBid.type === "pepperNo") return "Pepper No";
     if (currentBid.type === "pepper") return "Pepper";
     return `Bid ${bidAmount}`;
   };
@@ -159,7 +158,9 @@ export function RoundResultDialog({
             <span className="font-medium text-foreground">{bidder?.name}</span>
             <Badge variant="outline" className="gap-1">
               {getBidLabel()}
-              {currentBid.trumpSuit && currentBid.trumpSuit !== "none" && (
+              {currentBid.trumpSuit === "none" ? (
+                <Ban className="h-3 w-3 text-muted-foreground" />
+              ) : currentBid.trumpSuit && (
                 <SuitIcon suit={currentBid.trumpSuit} size="sm" />
               )}
             </Badge>
