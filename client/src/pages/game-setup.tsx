@@ -9,7 +9,7 @@ import { useGame } from "@/lib/gameContext";
 import { usePlayerProfiles } from "@/lib/playerProfilesContext";
 import { getTargetScore } from "@shared/schema";
 import { PlayerComboInput } from "@/components/player-combo-input";
-import { Users, CircleDot, Play, History, UserCog, Calculator, Pencil } from "lucide-react";
+import { Users, CircleDot, Play, History, UserCog, Calculator } from "lucide-react";
 
 const SCORING_MODE_KEY = "cribbage-scoring-mode";
 
@@ -84,23 +84,13 @@ export default function GameSetup() {
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-lg mx-auto px-4 py-8">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-            <svg viewBox="0 0 24 24" className="h-8 w-8 text-primary" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="3" y="2" width="18" height="20" rx="2" />
-              <path d="M6 6h.01M9 6h.01M12 6h.01M6 9h.01M9 9h.01M12 9h.01M6 12h.01M9 12h.01M12 12h.01" strokeLinecap="round" />
-              <path d="M15 6h.01M18 6h.01M15 9h.01M18 9h.01M15 12h.01M18 12h.01" strokeLinecap="round" />
-              <path d="M6 15h.01M9 15h.01M12 15h.01M15 15h.01M18 15h.01" strokeLinecap="round" />
-              <path d="M6 18h.01M9 18h.01M12 18h.01M15 18h.01M18 18h.01" strokeLinecap="round" />
-              <path d="M3 14h18" strokeWidth="0.5" />
-            </svg>
+      <div className="max-w-lg mx-auto px-4 py-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Cribbage</h1>
+            <p className="text-sm text-muted-foreground">Scorekeeper</p>
           </div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Cribbage</h1>
-          <p className="text-muted-foreground">
-            The classic card game scorekeeper
-          </p>
-          <div className="flex justify-center gap-2 mt-4">
+          <div className="flex gap-2">
             <Link href="/players">
               <Button variant="outline" size="sm" className="gap-1.5" data-testid="link-manage-players">
                 <UserCog className="h-4 w-4" />
@@ -110,7 +100,7 @@ export default function GameSetup() {
             <Link href="/history">
               <Button variant="outline" size="sm" className="gap-1.5" data-testid="link-game-history">
                 <History className="h-4 w-4" />
-                History {gameHistory.length > 0 && `(${gameHistory.length})`}
+                {gameHistory.length > 0 ? gameHistory.length : ""}
               </Button>
             </Link>
           </div>
@@ -199,33 +189,19 @@ export default function GameSetup() {
             </p>
           </div>
 
-          <div className="space-y-3">
-            <Label className="flex items-center gap-2 text-base">
-              {scoringMode === "calculated" ? (
-                <Calculator className="h-4 w-4" />
-              ) : (
-                <Pencil className="h-4 w-4" />
-              )}
-              Default Scoring Mode
-            </Label>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2">
-                <Calculator className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Card Entry (Auto-calculate)</span>
-              </div>
-              <Switch
-                checked={scoringMode === "manual"}
-                onCheckedChange={handleScoringModeChange}
-                data-testid="switch-scoring-mode"
-              />
-              <div className="flex items-center gap-2">
-                <span className="text-sm">Manual Entry</span>
-                <Pencil className="h-4 w-4 text-muted-foreground" />
-              </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="scoring-mode" className="text-base cursor-pointer">
+                Card Entry (Auto-calculate)
+              </Label>
             </div>
-            <p className="text-xs text-muted-foreground">
-              You can always switch modes during the game
-            </p>
+            <Switch
+              id="scoring-mode"
+              checked={scoringMode === "calculated"}
+              onCheckedChange={(checked) => handleScoringModeChange(!checked)}
+              data-testid="switch-scoring-mode"
+            />
           </div>
 
           <div className="bg-muted/50 rounded-lg p-4 space-y-2">
