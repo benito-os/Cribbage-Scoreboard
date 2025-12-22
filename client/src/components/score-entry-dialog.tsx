@@ -211,31 +211,72 @@ export function ScoreEntryDialog({
 
           <TabsContent value="manual" className="space-y-4 mt-4">
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Points</Label>
-                <div className="text-2xl font-bold tabular-nums min-w-[3ch] text-right">
+              <div className="flex items-center justify-center">
+                <div className="text-4xl font-bold tabular-nums min-w-[4ch] text-center py-3 px-6 bg-muted/50 rounded-lg">
                   {manualScore || "0"}
                 </div>
               </div>
               
-              <div className="grid grid-cols-6 gap-1">
-                {Array.from({ length: 30 }, (_, i) => i).map((num) => (
+              <div className="grid grid-cols-3 gap-2 max-w-[200px] mx-auto">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                   <Button
                     key={num}
                     type="button"
-                    variant={manualScore === num.toString() ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setManualScore(num.toString())}
-                    data-testid={`button-score-${num}`}
-                    className="h-8 text-xs font-medium px-0"
+                    variant="outline"
+                    onClick={() => {
+                      const current = manualScore || "";
+                      const newVal = current + num.toString();
+                      const numVal = parseInt(newVal);
+                      if (numVal <= 29) {
+                        setManualScore(newVal);
+                      }
+                    }}
+                    data-testid={`button-numpad-${num}`}
+                    className="h-12 text-lg font-medium"
                   >
                     {num}
                   </Button>
                 ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setManualScore("")}
+                  data-testid="button-numpad-clear"
+                  className="h-12 text-sm font-medium"
+                >
+                  Clear
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const current = manualScore || "";
+                    const newVal = current + "0";
+                    const numVal = parseInt(newVal);
+                    if (numVal <= 29 && current !== "") {
+                      setManualScore(newVal);
+                    } else if (current === "") {
+                      setManualScore("0");
+                    }
+                  }}
+                  data-testid="button-numpad-0"
+                  className="h-12 text-lg font-medium"
+                >
+                  0
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setManualScore(manualScore.slice(0, -1))}
+                  data-testid="button-numpad-backspace"
+                  className="h-12 text-sm font-medium"
+                >
+                  Del
+                </Button>
               </div>
               
               <p className="text-xs text-muted-foreground text-center">
-                Tap a number to set the score (max 29)
+                Maximum hand score is 29 points
               </p>
             </div>
           </TabsContent>
