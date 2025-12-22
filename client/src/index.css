@@ -175,9 +175,9 @@
   --background: 0 0% 100%;
   --foreground: 0 70% 35%;
   --border: 0 30% 85%;
-  --card: 0 0% 98% / 0.85;
+  --card: 0 0% 98%;
   --card-foreground: 0 70% 35%;
-  --card-border: 0 30% 90% / 0.85;
+  --card-border: 0 30% 90%;
   --sidebar: 0 0% 96%;
   --sidebar-foreground: 0 70% 35%;
   --sidebar-border: 0 30% 88%;
@@ -242,6 +242,10 @@
   
   .badgers body {
     background: transparent;
+  }
+  
+  .badgers .shadcn-card {
+    background-color: hsl(0 0% 98% / 0.9);
   }
 }
 
