@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,18 +7,17 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { SuitIcon } from "./suit-icon";
-import type { GameState } from "@shared/schema";
-import { calculateScoreChange, getMaxBid, getPepperBid } from "@shared/schema";
-import { Minus, Plus, Check, X } from "lucide-react";
+import type { GameState, PlayerTricks } from "@shared/schema";
+import { calculateAllScoreChanges, getMaxTricks, getPepperBid } from "@shared/schema";
+import { Minus, Plus, Check, X, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface RoundResultDialogProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (tricksWon: number) => void;
+  onSubmit: (playerTricks: PlayerTricks) => void;
   gameState: GameState;
 }
 
@@ -29,14 +28,23 @@ export function RoundResultDialog({
   gameState,
 }: RoundResultDialogProps) {
   const { currentBid, players, playerCount } = gameState;
-  // For Pepper/Pepper No, max tricks equals the pepper bid value (all tricks)
-  // For standard bids, max is the normal trick count
-  const isPepperBid = currentBid?.type === "pepper" || currentBid?.type === "pepperNo";
-  const maxTricks = isPepperBid 
-    ? getPepperBid(playerCount) 
-    : (playerCount === 3 ? 8 : 6);
+  const maxTricks = getMaxTricks(playerCount);
 
-  const [tricksWon, setTricksWon] = useState<number>(0);
+  // Initialize tricks for all players
+  const [playerTricks, setPlayerTricks] = useState<PlayerTricks>(() => {
+    const initial: PlayerTricks = {};
+    players.forEach(p => { initial[p.id] = 0; });
+    return initial;
+  });
+
+  // Reset when dialog opens
+  useEffect(() => {
+    if (open) {
+      const initial: PlayerTricks = {};
+      players.forEach(p => { initial[p.id] = 0; });
+      setPlayerTricks(initial);
+    }
+  }, [open, players]);
 
   if (!currentBid?.bidderId) return null;
 
@@ -45,32 +53,44 @@ export function RoundResultDialog({
     ? currentBid.amount! 
     : getPepperBid(playerCount);
 
-  const { success, scoreChange } = calculateScoreChange(
+  // Calculate totals
+  const totalTricks = Object.values(playerTricks).reduce((sum, t) => sum + t, 0);
+  const isValidTotal = totalTricks === maxTricks;
+
+  // Calculate score preview
+  const { success, scoreChanges } = calculateAllScoreChanges(
+    currentBid.bidderId,
     currentBid.amount!,
     currentBid.type!,
-    tricksWon,
+    playerTricks,
     playerCount
   );
 
-  const incrementTricks = () => {
-    if (tricksWon < maxTricks) {
-      setTricksWon(prev => prev + 1);
+  const incrementTricks = (playerId: string) => {
+    if (totalTricks < maxTricks) {
+      setPlayerTricks(prev => ({
+        ...prev,
+        [playerId]: (prev[playerId] ?? 0) + 1,
+      }));
     }
   };
 
-  const decrementTricks = () => {
-    if (tricksWon > 0) {
-      setTricksWon(prev => prev - 1);
+  const decrementTricks = (playerId: string) => {
+    if ((playerTricks[playerId] ?? 0) > 0) {
+      setPlayerTricks(prev => ({
+        ...prev,
+        [playerId]: (prev[playerId] ?? 0) - 1,
+      }));
     }
   };
 
   const handleSubmit = () => {
-    onSubmit(tricksWon);
-    setTricksWon(0);
+    if (isValidTotal) {
+      onSubmit(playerTricks);
+    }
   };
 
   const handleClose = () => {
-    setTricksWon(0);
     onClose();
   };
 
@@ -82,99 +102,155 @@ export function RoundResultDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-2xl">Round Result</DialogTitle>
           <DialogDescription>
-            How many tricks did {bidder?.name} take?
+            Enter the tricks won by each player
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-5 py-4">
           {/* Current Bid Summary */}
-          <div className="bg-muted/50 rounded-lg p-4 text-center space-y-2">
-            <div className="text-lg font-medium">{bidder?.name}</div>
-            <div className="flex items-center justify-center gap-2">
-              <Badge variant="secondary" className="text-base gap-1">
+          <div className="bg-muted/50 rounded-lg p-3 text-center">
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <span className="font-medium">{bidder?.name}</span>
+              <Badge variant="secondary" className="gap-1">
                 {getBidLabel()}
                 {currentBid.trumpSuit && currentBid.trumpSuit !== "none" && (
                   <SuitIcon suit={currentBid.trumpSuit} size="sm" />
                 )}
               </Badge>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Needs {bidAmount} trick{bidAmount !== 1 ? "s" : ""} to succeed
-            </div>
-          </div>
-
-          {/* Tricks Won Input */}
-          <div className="space-y-2">
-            <Label className="text-center block">Tricks Won</Label>
-            <div className="flex items-center justify-center gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={decrementTricks}
-                disabled={tricksWon <= 0}
-                data-testid="button-tricks-decrease"
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-              <span
-                className="text-6xl font-bold tabular-nums w-20 text-center"
-                data-testid="text-tricks-won"
-              >
-                {tricksWon}
+              <span className="text-sm text-muted-foreground">
+                (needs {bidAmount})
               </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={incrementTricks}
-                disabled={tricksWon >= maxTricks}
-                data-testid="button-tricks-increase"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
-          {/* Result Preview */}
+          {/* Player Tricks Grid */}
+          <div className="space-y-2">
+            {players.map((player) => {
+              const tricks = playerTricks[player.id] ?? 0;
+              const isBidder = player.id === currentBid.bidderId;
+              const scoreChange = scoreChanges[player.id] ?? 0;
+
+              return (
+                <div
+                  key={player.id}
+                  className={cn(
+                    "flex items-center gap-3 p-3 rounded-lg",
+                    isBidder ? "bg-chart-4/10 border border-chart-4/20" : "bg-muted/30"
+                  )}
+                  data-testid={`row-player-tricks-${player.id}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{player.name}</span>
+                      {isBidder && (
+                        <Badge variant="outline" className="text-xs flex-shrink-0">
+                          Bidder
+                        </Badge>
+                      )}
+                    </div>
+                    <div className={cn(
+                      "text-sm tabular-nums",
+                      scoreChange > 0 ? "text-primary" : scoreChange < 0 ? "text-destructive" : "text-muted-foreground"
+                    )}>
+                      {scoreChange > 0 ? "+" : ""}{scoreChange} pts
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => decrementTricks(player.id)}
+                      disabled={tricks <= 0}
+                      data-testid={`button-tricks-decrease-${player.id}`}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span
+                      className="text-3xl font-bold tabular-nums w-10 text-center"
+                      data-testid={`text-tricks-${player.id}`}
+                    >
+                      {tricks}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => incrementTricks(player.id)}
+                      disabled={totalTricks >= maxTricks}
+                      data-testid={`button-tricks-increase-${player.id}`}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Total Validation */}
           <div
             className={cn(
-              "rounded-lg p-4 text-center",
-              success
+              "flex items-center justify-between p-3 rounded-lg",
+              isValidTotal
                 ? "bg-primary/10 border border-primary/20"
-                : "bg-destructive/10 border border-destructive/20"
+                : "bg-muted/50 border border-border"
             )}
           >
-            <div className="flex items-center justify-center gap-2 mb-1">
-              {success ? (
+            <div className="flex items-center gap-2">
+              {isValidTotal ? (
                 <Check className="h-5 w-5 text-primary" />
               ) : (
-                <X className="h-5 w-5 text-destructive" />
+                <AlertCircle className="h-5 w-5 text-muted-foreground" />
               )}
               <span className={cn(
-                "font-semibold",
-                success ? "text-primary" : "text-destructive"
+                "font-medium",
+                isValidTotal ? "text-primary" : "text-muted-foreground"
               )}>
-                {success ? "Bid Made!" : "Bid Failed"}
+                Total Tricks
               </span>
             </div>
-            <div
-              className={cn(
-                "text-3xl font-bold tabular-nums",
-                success ? "text-primary" : "text-destructive"
-              )}
-              data-testid="text-score-preview"
-            >
-              {scoreChange > 0 ? "+" : ""}{scoreChange}
-            </div>
-            <div className="text-sm text-muted-foreground mt-1">
-              {bidder?.name}: {bidder?.score} → {(bidder?.score ?? 0) + scoreChange}
+            <div className="flex items-center gap-1">
+              <span className={cn(
+                "text-2xl font-bold tabular-nums",
+                isValidTotal ? "text-primary" : "text-foreground"
+              )}>
+                {totalTricks}
+              </span>
+              <span className="text-muted-foreground">/ {maxTricks}</span>
             </div>
           </div>
+
+          {/* Bid Result Preview */}
+          {isValidTotal && (
+            <div
+              className={cn(
+                "rounded-lg p-3 text-center",
+                success
+                  ? "bg-primary/10 border border-primary/20"
+                  : "bg-destructive/10 border border-destructive/20"
+              )}
+            >
+              <div className="flex items-center justify-center gap-2">
+                {success ? (
+                  <Check className="h-5 w-5 text-primary" />
+                ) : (
+                  <X className="h-5 w-5 text-destructive" />
+                )}
+                <span className={cn(
+                  "font-semibold",
+                  success ? "text-primary" : "text-destructive"
+                )}>
+                  {bidder?.name} {success ? "made the bid!" : "missed the bid"}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2">
@@ -190,6 +266,7 @@ export function RoundResultDialog({
           <Button
             type="button"
             onClick={handleSubmit}
+            disabled={!isValidTotal}
             className="flex-1"
             data-testid="button-result-confirm"
           >

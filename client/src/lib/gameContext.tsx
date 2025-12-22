@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
-import type { GameState, Player, Round, TrumpSuit, BidType } from "@shared/schema";
-import { getTargetScore, calculateScoreChange, getPepperBid } from "@shared/schema";
+import type { GameState, Player, Round, TrumpSuit, BidType, PlayerTricks } from "@shared/schema";
+import { getTargetScore, calculateAllScoreChanges, getPepperBid } from "@shared/schema";
 
 const STORAGE_KEY = "pepper-game-state";
 
@@ -9,9 +9,10 @@ interface GameContextType {
   createGame: (playerCount: 3 | 4, playerNames: string[], dealerIndex: number) => void;
   startBidding: () => void;
   submitBid: (bidderId: string, amount: number, type: BidType, trumpSuit: TrumpSuit) => void;
-  submitRoundResult: (tricksWon: number) => void;
+  submitRoundResult: (playerTricks: PlayerTricks) => void;
   undoLastRound: () => void;
   resetGame: () => void;
+  reorderPlayers: (newOrder: Player[]) => void;
   getPlayer: (id: string) => Player | undefined;
   getCurrentDealer: () => Player | undefined;
   canUndo: boolean;
@@ -94,16 +95,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const submitRoundResult = useCallback((tricksWon: number) => {
+  const submitRoundResult = useCallback((playerTricks: PlayerTricks) => {
     setGameState(prev => {
       if (!prev || !prev.currentBid?.bidderId) return prev;
 
       const { bidderId, amount, type, trumpSuit } = prev.currentBid;
       const effectiveAmount = type === "standard" ? amount! : getPepperBid(prev.playerCount);
-      const { success, scoreChange } = calculateScoreChange(
+      
+      const { success, scoreChanges } = calculateAllScoreChanges(
+        bidderId,
         amount!,
         type!,
-        tricksWon,
+        playerTricks,
         prev.playerCount
       );
 
@@ -115,20 +118,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
         bidAmount: effectiveAmount,
         bidType: type!,
         trumpSuit: trumpSuit!,
-        tricksWon,
+        playerTricks,
         bidSuccess: success,
-        scoreChange,
+        scoreChanges,
       };
 
-      const updatedPlayers = prev.players.map(player => {
-        if (player.id === bidderId) {
-          return { ...player, score: player.score + scoreChange };
-        }
-        return player;
-      });
+      // Update all player scores
+      const updatedPlayers = prev.players.map(player => ({
+        ...player,
+        score: player.score + (scoreChanges[player.id] ?? 0),
+      }));
 
-      // Check for winner
-      const winner = updatedPlayers.find(p => p.score >= prev.targetScore);
+      // Check for winner (highest score if multiple reach target)
+      const winners = updatedPlayers.filter(p => p.score >= prev.targetScore);
+      const winner = winners.length > 0 
+        ? winners.reduce((a, b) => a.score >= b.score ? a : b)
+        : null;
 
       // Rotate dealer
       const nextDealerIndex = (prev.currentDealerIndex + 1) % prev.playerCount;
@@ -154,12 +159,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (!prev || prev.rounds.length === 0) return prev;
 
       const lastRound = prev.rounds[prev.rounds.length - 1];
-      const updatedPlayers = prev.players.map(player => {
-        if (player.id === lastRound.bidderId) {
-          return { ...player, score: player.score - lastRound.scoreChange };
-        }
-        return player;
-      });
+      
+      // Reverse all score changes
+      const updatedPlayers = prev.players.map(player => ({
+        ...player,
+        score: player.score - (lastRound.scoreChanges[player.id] ?? 0),
+      }));
 
       // Restore previous dealer
       const prevDealerIndex = (prev.currentDealerIndex - 1 + prev.playerCount) % prev.playerCount;
@@ -175,6 +180,30 @@ export function GameProvider({ children }: { children: ReactNode }) {
         currentDealerIndex: prevDealerIndex,
         gamePhase: "bidding",
         winnerId: undefined,
+      };
+    });
+  }, []);
+
+  const reorderPlayers = useCallback((newOrder: Player[]) => {
+    setGameState(prev => {
+      if (!prev) return prev;
+      
+      // Find the current dealer's ID
+      const currentDealerId = prev.players[prev.currentDealerIndex]?.id;
+      
+      // Find the new index of the dealer
+      const newDealerIndex = newOrder.findIndex(p => p.id === currentDealerId);
+      
+      // Update dealer flags
+      const playersWithDealer = newOrder.map((p, i) => ({
+        ...p,
+        isDealer: i === newDealerIndex,
+      }));
+
+      return {
+        ...prev,
+        players: playersWithDealer,
+        currentDealerIndex: newDealerIndex >= 0 ? newDealerIndex : 0,
       };
     });
   }, []);
@@ -205,6 +234,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         submitRoundResult,
         undoLastRound,
         resetGame,
+        reorderPlayers,
         getPlayer,
         getCurrentDealer,
         canUndo,

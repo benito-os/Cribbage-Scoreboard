@@ -17,9 +17,11 @@ import { PlayerScoreCard } from "@/components/player-score-card";
 import { RoundHistory } from "@/components/round-history";
 import { BidDialog } from "@/components/bid-dialog";
 import { RoundResultDialog } from "@/components/round-result-dialog";
+import { PlayerReorderDialog } from "@/components/player-reorder-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SuitIcon } from "@/components/suit-icon";
 import { Badge } from "@/components/ui/badge";
+import type { PlayerTricks, Player } from "@shared/schema";
 import {
   Undo2,
   Plus,
@@ -28,11 +30,12 @@ import {
   Trophy,
   Check,
   Flame,
+  ArrowUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function ActiveGame() {
-  const { gameState, submitBid, submitRoundResult, undoLastRound, resetGame, canUndo } =
+  const { gameState, submitBid, submitRoundResult, undoLastRound, resetGame, reorderPlayers, canUndo } =
     useGame();
   const [, setLocation] = useLocation();
 
@@ -40,6 +43,7 @@ export default function ActiveGame() {
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showUndoConfirm, setShowUndoConfirm] = useState(false);
+  const [showReorderDialog, setShowReorderDialog] = useState(false);
 
   // Redirect to setup if no game
   if (!gameState) {
@@ -67,8 +71,8 @@ export default function ActiveGame() {
     setShowResultDialog(true);
   };
 
-  const handleResultSubmit = (tricksWon: number) => {
-    submitRoundResult(tricksWon);
+  const handleResultSubmit = (playerTricks: PlayerTricks) => {
+    submitRoundResult(playerTricks);
     setShowResultDialog(false);
   };
 
@@ -86,6 +90,10 @@ export default function ActiveGame() {
   const handleNewGame = () => {
     resetGame();
     setLocation("/");
+  };
+
+  const handleReorder = (newOrder: Player[]) => {
+    reorderPlayers(newOrder);
   };
 
   const winner = players.find((p) => p.id === winnerId);
@@ -120,6 +128,15 @@ export default function ActiveGame() {
           </div>
 
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowReorderDialog(true)}
+              title="Reorder players"
+              data-testid="button-reorder"
+            >
+              <ArrowUpDown className="h-5 w-5" />
+            </Button>
             {canUndo && (
               <Button
                 variant="ghost"
@@ -242,6 +259,13 @@ export default function ActiveGame() {
         onClose={() => setShowResultDialog(false)}
         onSubmit={handleResultSubmit}
         gameState={gameState}
+      />
+
+      <PlayerReorderDialog
+        open={showReorderDialog}
+        onClose={() => setShowReorderDialog(false)}
+        onSave={handleReorder}
+        players={players}
       />
 
       <AlertDialog open={showUndoConfirm} onOpenChange={setShowUndoConfirm}>
