@@ -88,7 +88,7 @@ export function getTargetScore(playerCount: 3 | 4): number {
 }
 
 // Calculate score changes for all players in a round
-// Bidder: +bid if successful, -bid if failed
+// Bidder: max(bid, tricks) if successful, -bid if failed
 // Helpers (play with bidder): +1 per trick, OR -bid if 0 tricks
 // Folders: 0 points (neutral, sat out)
 // No Trump special rule: All players must participate - folding not allowed
@@ -119,8 +119,8 @@ export function calculateAllScoreChanges(
   
   for (const [playerId, tricks] of Object.entries(playerTricks)) {
     if (playerId === bidderId) {
-      // Bidder always gets +/- bid amount
-      scoreChanges[playerId] = success ? effectiveBid : -effectiveBid;
+      // Bidder: if successful, gets higher of bid or tricks won; if failed, loses bid amount
+      scoreChanges[playerId] = success ? Math.max(effectiveBid, tricks) : -effectiveBid;
     } else {
       // Check participation status
       const participation = playerParticipation?.[playerId] ?? "play";
