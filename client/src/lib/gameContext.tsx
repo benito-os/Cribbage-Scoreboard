@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
-import type { GameState, Player, Round, TrumpSuit, BidType, PlayerTricks } from "@shared/schema";
+import type { GameState, Player, Round, TrumpSuit, BidType, PlayerTricks, PlayerParticipation } from "@shared/schema";
 import { getTargetScore, calculateAllScoreChanges, getPepperBid } from "@shared/schema";
 
 const STORAGE_KEY = "pepper-game-state";
@@ -9,7 +9,7 @@ interface GameContextType {
   createGame: (playerCount: 3 | 4, playerNames: string[], dealerIndex: number) => void;
   startBidding: () => void;
   submitBid: (bidderId: string, amount: number, type: BidType, trumpSuit: TrumpSuit) => void;
-  submitRoundResult: (playerTricks: PlayerTricks) => void;
+  submitRoundResult: (playerTricks: PlayerTricks, playerParticipation?: PlayerParticipation) => void;
   undoLastRound: () => void;
   resetGame: () => void;
   reorderPlayers: (newOrder: Player[]) => void;
@@ -95,7 +95,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const submitRoundResult = useCallback((playerTricks: PlayerTricks) => {
+  const submitRoundResult = useCallback((playerTricks: PlayerTricks, playerParticipation?: PlayerParticipation) => {
     setGameState(prev => {
       if (!prev || !prev.currentBid?.bidderId) return prev;
 
@@ -108,7 +108,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         type!,
         playerTricks,
         prev.playerCount,
-        trumpSuit
+        trumpSuit,
+        playerParticipation
       );
 
       const newRound: Round = {
@@ -120,6 +121,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         bidType: type!,
         trumpSuit: trumpSuit!,
         playerTricks,
+        playerParticipation,
         bidSuccess: success,
         scoreChanges,
       };
