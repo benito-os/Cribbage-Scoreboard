@@ -1,5 +1,6 @@
 import type { Player } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { Trophy } from "lucide-react";
 
 interface CribbageBoardProps {
   players: Player[];
@@ -10,180 +11,136 @@ const DOUBLE_SKUNK_LINE = 61;
 const SKUNK_LINE = 91;
 
 const PLAYER_COLORS = [
-  { peg: "bg-red-500", hole: "bg-red-500/30", text: "text-red-600 dark:text-red-400", ring: "ring-red-500" },
-  { peg: "bg-blue-500", hole: "bg-blue-500/30", text: "text-blue-600 dark:text-blue-400", ring: "ring-blue-500" },
-  { peg: "bg-green-500", hole: "bg-green-500/30", text: "text-green-600 dark:text-green-400", ring: "ring-green-500" },
-  { peg: "bg-amber-500", hole: "bg-amber-500/30", text: "text-amber-600 dark:text-amber-400", ring: "ring-amber-500" },
+  { bg: "bg-red-500", text: "text-red-600 dark:text-red-400", border: "border-red-500" },
+  { bg: "bg-blue-500", text: "text-blue-600 dark:text-blue-400", border: "border-blue-500" },
+  { bg: "bg-green-500", text: "text-green-600 dark:text-green-400", border: "border-green-500" },
+  { bg: "bg-purple-500", text: "text-purple-600 dark:text-purple-400", border: "border-purple-500" },
 ];
 
 export function CribbageBoard({ players, targetScore }: CribbageBoardProps) {
-  const holesPerRow = 30;
-  const rows = 4;
-  const totalHoles = holesPerRow * rows + 1;
+  const getPercentage = (score: number) => Math.min(100, (score / targetScore) * 100);
+  
+  const milestones = [
+    { score: DOUBLE_SKUNK_LINE, label: "61", color: "bg-red-500", description: "Double Skunk" },
+    { score: SKUNK_LINE, label: "91", color: "bg-amber-500", description: "Skunk" },
+    { score: targetScore, label: "121", color: "bg-green-500", description: "Finish" },
+  ];
 
-  const getHolePosition = (score: number): { row: number; col: number; isStart: boolean; isFinish: boolean } => {
-    if (score >= targetScore) {
-      return { row: 3, col: holesPerRow, isStart: false, isFinish: true };
-    }
-    if (score <= 0) {
-      return { row: -1, col: 0, isStart: true, isFinish: false };
-    }
-    const adjustedScore = score - 1;
-    const row = Math.floor(adjustedScore / holesPerRow);
-    const col = row % 2 === 0 
-      ? adjustedScore % holesPerRow 
-      : holesPerRow - 1 - (adjustedScore % holesPerRow);
-    return { row, col, isStart: false, isFinish: false };
-  };
-
-  const isSkunkHole = (holeScore: number) => holeScore === SKUNK_LINE;
-  const isDoubleSkunkHole = (holeScore: number) => holeScore === DOUBLE_SKUNK_LINE;
-
-  const getHoleScore = (row: number, col: number): number => {
-    const isReversed = row % 2 === 1;
-    const actualCol = isReversed ? holesPerRow - 1 - col : col;
-    return row * holesPerRow + actualCol + 1;
-  };
-
-  const playersAtStart = players.filter(p => getHolePosition(p.score).isStart);
-  const playersAtFinish = players.filter(p => getHolePosition(p.score).isFinish);
+  const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
 
   return (
-    <div className="space-y-2">
-      <div className="bg-gradient-to-br from-amber-800 to-amber-900 dark:from-amber-900 dark:to-amber-950 rounded-lg p-3 shadow-inner">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[10px] text-amber-200/60">Start</span>
-          <div className="flex gap-1">
-            {playersAtStart.map((p) => (
-              <div
-                key={p.id}
-                className={cn(
-                  "w-2.5 h-2.5 rounded-full shadow-md ring-1 ring-white/50",
-                  PLAYER_COLORS[players.indexOf(p)]?.peg
-                )}
-                title={`${p.name}: ${p.score} pts`}
-              />
+    <div className="space-y-4">
+      <div className="relative bg-muted/50 rounded-lg p-4">
+        <div className="relative h-3 bg-muted rounded-full overflow-hidden mb-6">
+          <div className="absolute inset-0 flex">
+            <div 
+              className="bg-red-500/20" 
+              style={{ width: `${getPercentage(DOUBLE_SKUNK_LINE)}%` }} 
+            />
+            <div 
+              className="bg-amber-500/20" 
+              style={{ width: `${getPercentage(SKUNK_LINE) - getPercentage(DOUBLE_SKUNK_LINE)}%` }} 
+            />
+            <div 
+              className="bg-green-500/20" 
+              style={{ width: `${100 - getPercentage(SKUNK_LINE)}%` }} 
+            />
+          </div>
+          
+          {milestones.map((milestone) => (
+            <div
+              key={milestone.score}
+              className="absolute top-0 bottom-0 w-0.5 bg-border"
+              style={{ left: `${getPercentage(milestone.score)}%` }}
+            />
+          ))}
+        </div>
+
+        <div className="flex justify-between text-xs text-muted-foreground mb-4">
+          <span>0</span>
+          <div className="flex gap-6">
+            {milestones.map((milestone) => (
+              <div key={milestone.score} className="flex items-center gap-1">
+                <div className={cn("w-2 h-2 rounded-full", milestone.color)} />
+                <span>{milestone.label}</span>
+              </div>
             ))}
-            {playersAtStart.length === 0 && (
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-950/60" />
-            )}
           </div>
         </div>
 
-        <div className="space-y-1">
-          {Array.from({ length: rows }).map((_, rowIndex) => {
-            const isReversed = rowIndex % 2 === 1;
+        <div className="space-y-2">
+          {sortedPlayers.map((player) => {
+            const color = PLAYER_COLORS[players.indexOf(player)] || PLAYER_COLORS[0];
+            const percentage = getPercentage(player.score);
+            const isWinner = player.score >= targetScore;
             
             return (
-              <div key={rowIndex} className="flex items-center gap-0.5">
-                <div className="w-6 text-[10px] text-amber-200/60 text-right pr-1">
-                  {rowIndex * holesPerRow + 1}
+              <div key={player.id} className="flex items-center gap-3">
+                <div className="w-20 flex items-center gap-1.5 flex-shrink-0">
+                  <div className={cn("w-3 h-3 rounded-full flex-shrink-0", color.bg)} />
+                  <span className={cn("text-sm font-medium truncate", color.text)}>
+                    {player.name}
+                  </span>
                 </div>
                 
-                <div className={cn(
-                  "flex gap-[2px]",
-                  isReversed && "flex-row-reverse"
-                )}>
-                  {Array.from({ length: holesPerRow }).map((_, colIndex) => {
-                    const holeScore = getHoleScore(rowIndex, colIndex);
-                    const isSkunk = isSkunkHole(holeScore);
-                    const isDoubleSkunk = isDoubleSkunkHole(holeScore);
+                <div className="flex-1 relative">
+                  <div className="h-6 bg-muted rounded-md overflow-hidden relative">
+                    <div 
+                      className={cn(
+                        "absolute inset-y-0 left-0 rounded-md transition-all duration-300",
+                        color.bg,
+                        "opacity-80"
+                      )}
+                      style={{ width: `${percentage}%` }}
+                    />
                     
-                    const playersAtHole = players.filter(p => {
-                      const pos = getHolePosition(p.score);
-                      return !pos.isStart && !pos.isFinish && pos.row === rowIndex && pos.col === colIndex;
-                    });
-
-                    const isFifth = (colIndex + 1) % 5 === 0;
-
-                    return (
-                      <div
-                        key={colIndex}
-                        className={cn(
-                          "relative w-2 h-2 rounded-full transition-all",
-                          isFifth ? "mr-1" : "",
-                          isSkunk 
-                            ? "bg-amber-400/80 ring-1 ring-amber-300" 
-                            : isDoubleSkunk 
-                              ? "bg-red-400/80 ring-1 ring-red-300" 
-                              : "bg-amber-950/60 dark:bg-amber-950/80"
-                        )}
-                        title={`Hole ${holeScore}`}
-                      >
-                        {playersAtHole.length > 0 && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            {playersAtHole.length === 1 ? (
-                              <div className={cn(
-                                "w-2.5 h-2.5 rounded-full shadow-md ring-1 ring-white/50",
-                                PLAYER_COLORS[players.indexOf(playersAtHole[0])]?.peg
-                              )} />
-                            ) : (
-                              <div className="flex -space-x-1">
-                                {playersAtHole.slice(0, 2).map((p, i) => (
-                                  <div
-                                    key={p.id}
-                                    className={cn(
-                                      "w-2 h-2 rounded-full shadow-md ring-1 ring-white/50",
-                                      PLAYER_COLORS[players.indexOf(p)]?.peg
-                                    )}
-                                    style={{ zIndex: 10 - i }}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                    <div 
+                      className="absolute top-0 bottom-0 w-px bg-red-500/50"
+                      style={{ left: `${getPercentage(DOUBLE_SKUNK_LINE)}%` }}
+                    />
+                    <div 
+                      className="absolute top-0 bottom-0 w-px bg-amber-500/50"
+                      style={{ left: `${getPercentage(SKUNK_LINE)}%` }}
+                    />
+                    
+                    <div 
+                      className="absolute inset-y-0 flex items-center justify-end pr-2 transition-all duration-300"
+                      style={{ width: `${Math.max(percentage, 10)}%` }}
+                    >
+                      {isWinner ? (
+                        <Trophy className="w-4 h-4 text-white" />
+                      ) : (
+                        <span className="text-xs font-bold text-white drop-shadow-sm">
+                          {player.score}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-
-                <div className="w-6 text-[10px] text-amber-200/60 text-left pl-1">
-                  {(rowIndex + 1) * holesPerRow}
+                
+                <div className="w-12 text-right flex-shrink-0">
+                  <span className="text-sm tabular-nums font-medium">
+                    {targetScore - player.score > 0 ? targetScore - player.score : "Win"}
+                  </span>
                 </div>
               </div>
             );
           })}
-
-          <div className="flex items-center justify-end pr-6 mt-1 gap-2">
-            <span className="text-[10px] text-amber-200/60">{targetScore}</span>
-            <div className={cn(
-              "w-4 h-4 rounded-full bg-gradient-to-br from-amber-300 to-amber-500 ring-2 ring-amber-300/50 shadow-lg",
-              "flex items-center justify-center"
-            )}>
-              {playersAtFinish.length > 0 && (
-                <div className={cn(
-                  "w-2.5 h-2.5 rounded-full shadow-md ring-1 ring-white/50",
-                  PLAYER_COLORS[players.indexOf(playersAtFinish[0])]?.peg
-                )} />
-              )}
-            </div>
-          </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs px-1">
-        <div className="flex flex-wrap gap-x-3 gap-y-1">
-          {players.map((player, idx) => {
-            const color = PLAYER_COLORS[idx];
-            return (
-              <div key={player.id} className="flex items-center gap-1.5">
-                <div className={cn("h-2.5 w-2.5 rounded-full shadow-sm", color.peg)} />
-                <span className={cn("font-medium", color.text)}>{player.name}</span>
-                <span className="text-muted-foreground">({player.score})</span>
-              </div>
-            );
-          })}
+      <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-2 bg-red-500/20 rounded-sm border border-red-500/30" />
+          <span>Double Skunk Zone (0-60)</span>
         </div>
-        <div className="flex gap-2 text-[10px] text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-red-400/80" />
-            <span>61</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-amber-400/80" />
-            <span>91</span>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-2 bg-amber-500/20 rounded-sm border border-amber-500/30" />
+          <span>Skunk Zone (61-90)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-2 bg-green-500/20 rounded-sm border border-green-500/30" />
+          <span>Safe (91-121)</span>
         </div>
       </div>
     </div>
