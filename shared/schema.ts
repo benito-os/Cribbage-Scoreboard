@@ -64,6 +64,7 @@ export const handResultSchema = z.object({
   peggingScores: z.record(z.string(), z.number()), // Points earned during play phase
   handScores: z.array(scoreEntrySchema), // Each player's hand score
   cribScore: scoreEntrySchema.optional(), // Dealer's crib score
+  hisHeelsPoints: z.number().optional(), // 2 points if starter was a Jack
   scoreChanges: z.record(z.string(), z.number()), // Total score change per player this hand
 });
 export type HandResult = z.infer<typeof handResultSchema>;
@@ -87,6 +88,7 @@ export const gameStateSchema = z.object({
     handScores: z.array(scoreEntrySchema).optional(),
     cribScore: scoreEntrySchema.optional(),
     hisHeelsAwarded: z.boolean().optional(),
+    hisHeelsPoints: z.number().optional(),
   }).optional(),
   winnerId: z.string().optional(),
 });

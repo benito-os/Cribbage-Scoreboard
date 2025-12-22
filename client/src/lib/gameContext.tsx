@@ -120,6 +120,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       // Check for His Heels - if starter is a Jack, dealer gets 2 points
       let updatedPlayers = prev.players;
       let hisHeelsAwarded = false;
+      let hisHeelsPoints = 0;
       
       if (checkHisHeels(card)) {
         const dealerId = prev.players[prev.currentDealerIndex].id;
@@ -130,6 +131,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           return player;
         });
         hisHeelsAwarded = true;
+        hisHeelsPoints = 2;
       }
       
       // Check for winner after His Heels
@@ -145,6 +147,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           ...prev.currentHand,
           starterCard: card,
           hisHeelsAwarded,
+          hisHeelsPoints,
         },
         gamePhase: winner ? "complete" : prev.gamePhase,
         winnerId: winner?.id,
@@ -249,25 +252,28 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setGameState(prev => {
       if (!prev || !prev.currentHand) return prev;
 
-      const { peggingScores, handScores, cribScore, starterCard } = prev.currentHand;
+      const { peggingScores, handScores, cribScore, starterCard, hisHeelsPoints } = prev.currentHand;
+      const dealerId = prev.players[prev.currentDealerIndex].id;
       
-      // Calculate total score changes for this hand
+      // Calculate total score changes for this hand (including His Heels for dealer)
       const scoreChanges: Record<string, number> = {};
       for (const player of prev.players) {
         scoreChanges[player.id] = 
           (peggingScores?.[player.id] ?? 0) +
           (handScores?.find(s => s.playerId === player.id)?.points ?? 0) +
-          (cribScore?.playerId === player.id ? cribScore.points : 0);
+          (cribScore?.playerId === player.id ? cribScore.points : 0) +
+          (player.id === dealerId ? (hisHeelsPoints ?? 0) : 0);
       }
 
       const newHand: HandResult = {
         id: generateId(),
         handNumber: prev.hands.length + 1,
-        dealerId: prev.players[prev.currentDealerIndex].id,
+        dealerId,
         starterCard,
         peggingScores: peggingScores ?? {},
         handScores: handScores ?? [],
         cribScore,
+        hisHeelsPoints: hisHeelsPoints ?? undefined,
         scoreChanges,
       };
 
