@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GameProvider } from "@/lib/gameContext";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ThemedBackground } from "@/components/themed-background";
 import GameSetup from "@/pages/game-setup";
 import ActiveGame from "@/pages/active-game";
 import NotFound from "@/pages/not-found";
@@ -23,6 +24,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
+        <ThemedBackground />
         <TooltipProvider>
           <GameProvider>
             <Toaster />
