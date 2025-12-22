@@ -11,11 +11,13 @@ interface GameContextType {
   submitBid: (bidderId: string, amount: number, type: BidType, trumpSuit: TrumpSuit) => void;
   submitRoundResult: (playerTricks: PlayerTricks, playerParticipation?: PlayerParticipation) => void;
   undoLastRound: () => void;
+  redoRound: () => void;
   resetGame: () => void;
   reorderPlayers: (newOrder: Player[]) => void;
   getPlayer: (id: string) => Player | undefined;
   getCurrentDealer: () => Player | undefined;
   canUndo: boolean;
+  canRedo: boolean;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -46,6 +48,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
     return null;
   });
+
+  // Redo stack for undone rounds
+  const [redoStack, setRedoStack] = useState<{
+    round: Round;
+    dealerIndex: number;
+    playerScores: Record<string, number>;
+  }[]>([]);
 
   // Persist state to localStorage
   useEffect(() => {
@@ -145,6 +154,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         isDealer: i === nextDealerIndex,
       }));
 
+      // Clear redo stack when a new round is submitted
+      setRedoStack([]);
+
       return {
         ...prev,
         players: playersWithDealer,
@@ -162,6 +174,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (!prev || prev.rounds.length === 0) return prev;
 
       const lastRound = prev.rounds[prev.rounds.length - 1];
+      
+      // Save to redo stack before removing
+      const playerScores: Record<string, number> = {};
+      prev.players.forEach(p => { playerScores[p.id] = p.score; });
+      setRedoStack(stack => [...stack, {
+        round: lastRound,
+        dealerIndex: prev.currentDealerIndex,
+        playerScores,
+      }]);
       
       // Reverse all score changes
       const updatedPlayers = prev.players.map(player => ({
@@ -186,6 +207,41 @@ export function GameProvider({ children }: { children: ReactNode }) {
       };
     });
   }, []);
+
+  const redoRound = useCallback(() => {
+    if (redoStack.length === 0) return;
+
+    const lastUndo = redoStack[redoStack.length - 1];
+    setRedoStack(stack => stack.slice(0, -1));
+
+    setGameState(prev => {
+      if (!prev) return prev;
+
+      const { round, dealerIndex, playerScores } = lastUndo;
+
+      // Restore player scores and dealer flag based on stored dealerIndex
+      const updatedPlayers = prev.players.map((player, idx) => ({
+        ...player,
+        score: playerScores[player.id] ?? player.score,
+        isDealer: idx === dealerIndex,
+      }));
+
+      // Check for winner
+      const winners = updatedPlayers.filter(p => p.score >= prev.targetScore);
+      const winner = winners.length > 0 
+        ? winners.reduce((a, b) => a.score >= b.score ? a : b)
+        : null;
+
+      return {
+        ...prev,
+        players: updatedPlayers,
+        rounds: [...prev.rounds, round],
+        currentDealerIndex: dealerIndex,
+        gamePhase: winner ? "complete" : "bidding",
+        winnerId: winner?.id,
+      };
+    });
+  }, [redoStack]);
 
   const reorderPlayers = useCallback((newOrder: Player[]) => {
     setGameState(prev => {
@@ -226,6 +282,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, [gameState]);
 
   const canUndo = (gameState?.rounds.length ?? 0) > 0;
+  const canRedo = redoStack.length > 0;
 
   return (
     <GameContext.Provider
@@ -236,11 +293,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
         submitBid,
         submitRoundResult,
         undoLastRound,
+        redoRound,
         resetGame,
         reorderPlayers,
         getPlayer,
         getCurrentDealer,
         canUndo,
+        canRedo,
       }}
     >
       {children}

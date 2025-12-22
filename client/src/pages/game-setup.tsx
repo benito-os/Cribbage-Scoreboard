@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useGame } from "@/lib/gameContext";
+import { usePlayerProfiles } from "@/lib/playerProfilesContext";
 import { getTargetScore } from "@shared/schema";
-import { Users, CircleDot, Play, Flame } from "lucide-react";
+import { PlayerComboInput } from "@/components/player-combo-input";
+import { Users, CircleDot, Play, Flame, History, UserCog } from "lucide-react";
 
 export default function GameSetup() {
   const { createGame, gameState } = useGame();
+  const { getOrCreateProfile, gameHistory } = usePlayerProfiles();
   const [, setLocation] = useLocation();
 
   const [playerCount, setPlayerCount] = useState<3 | 4>(4);
@@ -37,6 +39,10 @@ export default function GameSetup() {
   const handleStartGame = () => {
     const names = playerNames.slice(0, playerCount);
     const validNames = names.map((name, i) => name.trim() || `Player ${i + 1}`);
+    
+    // Create or get profiles for each player
+    validNames.forEach(name => getOrCreateProfile(name));
+    
     createGame(playerCount, validNames, dealerIndex);
     setLocation("/game");
   };
@@ -60,6 +66,20 @@ export default function GameSetup() {
           <p className="text-muted-foreground">
             The classic Hanson family game
           </p>
+          <div className="flex justify-center gap-2 mt-4">
+            <Link href="/players">
+              <Button variant="outline" size="sm" className="gap-1.5" data-testid="link-manage-players">
+                <UserCog className="h-4 w-4" />
+                Players
+              </Button>
+            </Link>
+            <Link href="/history">
+              <Button variant="outline" size="sm" className="gap-1.5" data-testid="link-game-history">
+                <History className="h-4 w-4" />
+                History {gameHistory.length > 0 && `(${gameHistory.length})`}
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Resume Existing Game */}
@@ -112,13 +132,16 @@ export default function GameSetup() {
           {/* Player Names */}
           <div className="space-y-3">
             <Label className="text-base">Player Names</Label>
+            <p className="text-xs text-muted-foreground -mt-1">
+              Type a new name or select an existing player from the dropdown
+            </p>
             <div className="space-y-2">
               {Array.from({ length: playerCount }).map((_, index) => (
                 <div key={index} className="flex items-center gap-2">
-                  <Input
-                    placeholder={`Player ${index + 1}`}
+                  <PlayerComboInput
                     value={playerNames[index]}
-                    onChange={(e) => handleNameChange(index, e.target.value)}
+                    onChange={(value) => handleNameChange(index, value)}
+                    placeholder={`Player ${index + 1}`}
                     data-testid={`input-player-name-${index}`}
                     className="flex-1"
                   />

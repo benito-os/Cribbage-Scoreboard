@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import type { PlayerTricks, Player, PlayerParticipation } from "@shared/schema";
 import {
   Undo2,
+  Redo2,
   Plus,
   RotateCcw,
   Home,
@@ -38,7 +39,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function ActiveGame() {
-  const { gameState, submitBid, submitRoundResult, undoLastRound, resetGame, reorderPlayers, canUndo } =
+  const { gameState, submitBid, submitRoundResult, undoLastRound, redoRound, resetGame, reorderPlayers, canUndo, canRedo } =
     useGame();
   const [, setLocation] = useLocation();
 
@@ -58,6 +59,8 @@ export default function ActiveGame() {
   const rankedPlayers = [...players].sort((a, b) => b.score - a.score);
   const lastRound = rounds.length > 0 ? rounds[rounds.length - 1] : null;
   const currentDealer = players[currentDealerIndex];
+  const nextDealerIndex = (currentDealerIndex + 1) % playerCount;
+  const nextDealer = players[nextDealerIndex];
 
   const handleNewRound = () => {
     setShowBidDialog(true);
@@ -80,6 +83,10 @@ export default function ActiveGame() {
 
   const handleUndo = () => {
     undoLastRound();
+  };
+
+  const handleRedo = () => {
+    redoRound();
   };
 
   const handleReset = () => {
@@ -157,6 +164,16 @@ export default function ActiveGame() {
                 data-testid="button-undo"
               >
                 <Undo2 className="h-5 w-5" />
+              </Button>
+            )}
+            {canRedo && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRedo}
+                data-testid="button-redo"
+              >
+                <Redo2 className="h-5 w-5" />
               </Button>
             )}
             <ThemeToggle />
@@ -267,6 +284,7 @@ export default function ActiveGame() {
                   targetScore={targetScore}
                   isCurrentBidder={currentBid?.bidderId === player.id}
                   isWinner={winnerId === player.id}
+                  isNextDealer={player.id === nextDealer?.id}
                   rank={index + 1}
                 />
               ))}

@@ -162,6 +162,45 @@ export function calculateScoreChange(
   return { success, scoreChange };
 }
 
+// Player Profile schema - persistent player identity with stats
+export const playerProfileSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1, "Name is required"),
+  createdAt: z.string(), // ISO date string
+  stats: z.object({
+    gamesPlayed: z.number().default(0),
+    gamesWon: z.number().default(0),
+    totalRounds: z.number().default(0),
+    bidsWon: z.number().default(0),
+    bidsLost: z.number().default(0),
+    pepperAttempts: z.number().default(0),
+    pepperSuccesses: z.number().default(0),
+    totalTricksWon: z.number().default(0),
+  }).default({}),
+});
+
+export type PlayerProfile = z.infer<typeof playerProfileSchema>;
+export type InsertPlayerProfile = Omit<PlayerProfile, "id" | "createdAt" | "stats">;
+
+// Completed game record for history
+export const completedGameSchema = z.object({
+  id: z.string(),
+  completedAt: z.string(), // ISO date string
+  playerCount: z.union([z.literal(3), z.literal(4)]),
+  targetScore: z.number(),
+  players: z.array(z.object({
+    profileId: z.string().optional(), // links to PlayerProfile
+    name: z.string(),
+    finalScore: z.number(),
+  })),
+  winnerId: z.string().optional(), // profileId of winner
+  winnerName: z.string(),
+  totalRounds: z.number(),
+  rounds: z.array(roundSchema),
+});
+
+export type CompletedGame = z.infer<typeof completedGameSchema>;
+
 // Legacy User types for compatibility
 export const users = {} as any;
 export const insertUserSchema = z.object({

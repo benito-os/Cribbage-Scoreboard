@@ -205,16 +205,18 @@ export function RoundResultDialog({
               {totalTricks} / {maxTricks}
             </Badge>
           </DialogTitle>
-          <DialogDescription className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-foreground">{bidder?.name}</span>
-            <Badge variant="outline" className="gap-1">
-              {getBidLabel()}
-              {currentBid.trumpSuit === "none" ? (
-                <Ban className="h-3 w-3 text-muted-foreground" />
-              ) : currentBid.trumpSuit && (
-                <SuitIcon suit={currentBid.trumpSuit} size="sm" />
-              )}
-            </Badge>
+          <DialogDescription asChild>
+            <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{bidder?.name}</span>
+              <Badge variant="outline" className="gap-1">
+                {getBidLabel()}
+                {currentBid.trumpSuit === "none" ? (
+                  <Ban className="h-3 w-3 text-muted-foreground" />
+                ) : currentBid.trumpSuit && (
+                  <SuitIcon suit={currentBid.trumpSuit} size="sm" />
+                )}
+              </Badge>
+            </div>
           </DialogDescription>
         </DialogHeader>
 

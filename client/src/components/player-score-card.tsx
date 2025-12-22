@@ -10,6 +10,7 @@ interface PlayerScoreCardProps {
   targetScore: number;
   isCurrentBidder?: boolean;
   isWinner?: boolean;
+  isNextDealer?: boolean;
   rank?: number;
 }
 
@@ -18,6 +19,7 @@ export function PlayerScoreCard({
   targetScore,
   isCurrentBidder = false,
   isWinner = false,
+  isNextDealer = false,
   rank,
 }: PlayerScoreCardProps) {
   const progress = Math.max(0, Math.min(100, (player.score / targetScore) * 100));
@@ -42,16 +44,24 @@ export function PlayerScoreCard({
       )}
 
       <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2 min-w-0">
-          {player.isDealer && (
-            <CircleDot className="h-4 w-4 text-chart-2 flex-shrink-0" aria-label="Dealer" />
-          )}
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <h3
             className="font-medium text-lg truncate"
             data-testid={`text-player-name-${player.id}`}
           >
             {player.name}
           </h3>
+          {player.isDealer && (
+            <Badge variant="outline" className="gap-1 text-xs">
+              <CircleDot className="h-3 w-3" />
+              Dealer
+            </Badge>
+          )}
+          {isNextDealer && !player.isDealer && (
+            <Badge variant="secondary" className="text-xs">
+              Next
+            </Badge>
+          )}
         </div>
         {rank !== undefined && (
           <Badge variant="secondary" className="flex-shrink-0 text-xs">
