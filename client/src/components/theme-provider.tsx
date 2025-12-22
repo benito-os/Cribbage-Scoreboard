@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-export type Theme = "light" | "dark" | "casino" | "badgers";
+export type Theme = "light" | "dark" | "badgers";
 
 interface ThemeContextType {
   theme: Theme;
@@ -21,7 +21,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("pepper-theme") as Theme;
-      if (saved && ["light", "dark", "casino", "badgers"].includes(saved)) return saved;
+      if (saved && ["light", "dark", "badgers"].includes(saved)) return saved;
       return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
     return "light";
@@ -29,12 +29,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.remove("dark", "casino", "badgers");
+    root.classList.remove("dark", "badgers");
     
     if (theme === "dark") {
       root.classList.add("dark");
-    } else if (theme === "casino") {
-      root.classList.add("casino");
     } else if (theme === "badgers") {
       root.classList.add("badgers");
     }

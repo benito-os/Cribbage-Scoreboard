@@ -1,4 +1,4 @@
-import { Moon, Sun, Sparkles, Trophy } from "lucide-react";
+import { Moon, Sun, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +11,6 @@ import { useTheme, type Theme } from "./theme-provider";
 const themeOptions: { value: Theme; label: string; icon: typeof Sun }[] = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
-  { value: "casino", label: "Casino", icon: Sparkles },
   { value: "badgers", label: "Badgers", icon: Trophy },
 ];
 
@@ -21,7 +20,6 @@ export function ThemeToggle() {
   const currentIcon = () => {
     switch (theme) {
       case "dark": return <Moon className="h-5 w-5" />;
-      case "casino": return <Sparkles className="h-5 w-5" />;
       case "badgers": return <Trophy className="h-5 w-5" />;
       default: return <Sun className="h-5 w-5" />;
     }
