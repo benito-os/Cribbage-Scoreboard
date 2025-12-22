@@ -312,6 +312,20 @@ interface PeggingScoreDialogProps {
   onSubmit: (scores: Record<string, number>) => void;
 }
 
+const PEGGING_PRESETS = [
+  { label: "Go", points: 1, description: "Last card / Go" },
+  { label: "15", points: 2, description: "Cards sum to 15" },
+  { label: "Pair", points: 2, description: "Matching rank" },
+  { label: "31", points: 2, description: "Exact 31" },
+  { label: "Run 3", points: 3, description: "3-card run" },
+  { label: "Run 4", points: 4, description: "4-card run" },
+  { label: "Run 5", points: 5, description: "5-card run" },
+  { label: "Trips", points: 6, description: "Three of a kind" },
+  { label: "Run 6", points: 6, description: "6-card run" },
+  { label: "Run 7", points: 7, description: "7-card run" },
+  { label: "Quads", points: 12, description: "Four of a kind" },
+];
+
 export function PeggingScoreDialog({
   open,
   onOpenChange,
@@ -320,6 +334,7 @@ export function PeggingScoreDialog({
 }: PeggingScoreDialogProps) {
   const [scores, setScores] = useState<Record<string, number>>({});
   const [activePlayer, setActivePlayer] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -327,6 +342,7 @@ export function PeggingScoreDialog({
       players.forEach(p => { initial[p.id] = 0; });
       setScores(initial);
       setActivePlayer(players[0]?.id ?? null);
+      setLastAction(null);
     }
   }, [open, players]);
 
@@ -335,94 +351,94 @@ export function PeggingScoreDialog({
     onOpenChange(false);
   };
 
+  const addPoints = (playerId: string, points: number, label: string) => {
+    setScores(prev => ({
+      ...prev,
+      [playerId]: Math.min(31, (prev[playerId] ?? 0) + points)
+    }));
+    const player = players.find(p => p.id === playerId);
+    setLastAction(`+${points} ${label} for ${player?.name}`);
+  };
+
   const adjustScore = (playerId: string, delta: number) => {
-    setScores(prev => ({
-      ...prev,
-      [playerId]: Math.max(0, Math.min(31, (prev[playerId] ?? 0) + delta))
-    }));
+    setScores(prev => {
+      const newScore = Math.max(0, Math.min(31, (prev[playerId] ?? 0) + delta));
+      return { ...prev, [playerId]: newScore };
+    });
+    setLastAction(null);
   };
 
-  const setScore = (playerId: string, value: number) => {
-    setScores(prev => ({
-      ...prev,
-      [playerId]: Math.max(0, Math.min(31, value))
-    }));
-  };
-
-  const quickButtons = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12];
+  const activePlayerName = players.find(p => p.id === activePlayer)?.name;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Pegging Scores</DialogTitle>
+          <DialogTitle>Pegging</DialogTitle>
           <DialogDescription>
-            Tap a player, then tap a number to set their score
+            Tap a player, then tap what they scored
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-3">
+          <div className={cn(
+            "grid gap-1.5",
+            players.length === 2 ? "grid-cols-2" : 
+            players.length === 3 ? "grid-cols-3" : "grid-cols-2"
+          )}>
             {players.map((player) => (
               <Button
                 key={player.id}
                 type="button"
                 variant={activePlayer === player.id ? "default" : "outline"}
                 onClick={() => setActivePlayer(player.id)}
-                className="flex items-center justify-between gap-2 h-auto py-2 px-3"
+                className="flex flex-col items-center gap-0.5 h-auto py-2 px-2"
                 data-testid={`button-select-player-${player.id}`}
               >
-                <span className="truncate">{player.name}</span>
-                <span className="text-lg font-bold tabular-nums">{scores[player.id] ?? 0}</span>
+                <span className="text-xs truncate max-w-full">{player.name}</span>
+                <span className="text-xl font-bold tabular-nums">{scores[player.id] ?? 0}</span>
               </Button>
             ))}
           </div>
 
           {activePlayer && (
-            <div className="space-y-2">
-              <div className="grid grid-cols-6 gap-1.5">
-                {quickButtons.map((num) => (
+            <>
+              <div className="grid grid-cols-3 gap-1.5">
+                {PEGGING_PRESETS.map((preset) => (
                   <Button
-                    key={num}
+                    key={preset.label}
                     type="button"
-                    variant={scores[activePlayer] === num ? "secondary" : "outline"}
-                    size="sm"
-                    onClick={() => setScore(activePlayer, num)}
-                    data-testid={`button-peg-${num}`}
-                    className="h-9 text-sm font-medium"
+                    variant="outline"
+                    onClick={() => addPoints(activePlayer, preset.points, preset.label)}
+                    className="flex flex-col items-center gap-0 h-auto py-2 px-1"
+                    data-testid={`button-peg-${preset.label.toLowerCase().replace(' ', '-')}`}
                   >
-                    {num}
+                    <span className="text-sm font-medium">{preset.label}</span>
+                    <span className="text-xs text-muted-foreground">+{preset.points}</span>
                   </Button>
                 ))}
-              </div>
-              
-              <div className="flex gap-2 justify-center">
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
+                  variant="ghost"
                   onClick={() => adjustScore(activePlayer, -1)}
+                  className="flex flex-col items-center gap-0 h-auto py-2 px-1"
                   data-testid="button-peg-minus"
-                  className="w-16"
                 >
-                  -1
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => adjustScore(activePlayer, 1)}
-                  data-testid="button-peg-plus"
-                  className="w-16"
-                >
-                  +1
+                  <span className="text-sm font-medium">Undo</span>
+                  <span className="text-xs text-muted-foreground">-1</span>
                 </Button>
               </div>
-            </div>
+
+              {lastAction && (
+                <div className="text-center text-sm text-muted-foreground bg-muted/50 rounded-md py-1.5">
+                  {lastAction}
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-0">
           <Button
             type="button"
             variant="outline"
@@ -436,7 +452,7 @@ export function PeggingScoreDialog({
             onClick={handleSubmit}
             data-testid="button-submit-pegging"
           >
-            Continue to Counting
+            Done Pegging
           </Button>
         </DialogFooter>
       </DialogContent>
