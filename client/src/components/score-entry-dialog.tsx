@@ -3,6 +3,7 @@ import type { Card, ScoreEntry, ScoreBreakdown } from "@shared/schema";
 import { calculateHandScore } from "@shared/schema";
 import { CardSelector, StarterCardSelector, CardDisplay } from "./card-selector";
 import { ScoreBreakdownDisplay } from "./score-breakdown";
+import { getScoringModePreference, setScoringModePreference } from "@/pages/game-setup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,9 +54,14 @@ export function ScoreEntryDialog({
       setManualScore("");
       setEditedScore(null);
       setIsEditing(false);
-      setMode("calculated");
+      setMode(getScoringModePreference());
     }
   }, [open, initialStarter]);
+
+  const handleModeChange = (newMode: "calculated" | "manual") => {
+    setMode(newMode);
+    setScoringModePreference(newMode);
+  };
 
   const breakdown: ScoreBreakdown | null = 
     handCards.length === 4 
@@ -108,7 +114,7 @@ export function ScoreEntryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={mode} onValueChange={(v) => setMode(v as "calculated" | "manual")}>
+        <Tabs value={mode} onValueChange={(v) => handleModeChange(v as "calculated" | "manual")}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="calculated" className="gap-2" data-testid="tab-calculated">
               <Calculator className="h-4 w-4" />

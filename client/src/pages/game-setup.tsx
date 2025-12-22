@@ -1,15 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { useGame } from "@/lib/gameContext";
 import { usePlayerProfiles } from "@/lib/playerProfilesContext";
 import { getTargetScore } from "@shared/schema";
 import { PlayerComboInput } from "@/components/player-combo-input";
-import { Users, CircleDot, Play, History, UserCog } from "lucide-react";
-import { SiCrunchbase } from "react-icons/si";
+import { Users, CircleDot, Play, History, UserCog, Calculator, Pencil } from "lucide-react";
+
+const SCORING_MODE_KEY = "cribbage-scoring-mode";
+
+export function getScoringModePreference(): "calculated" | "manual" {
+  if (typeof window !== "undefined") {
+    const saved = localStorage.getItem(SCORING_MODE_KEY);
+    if (saved === "manual" || saved === "calculated") {
+      return saved;
+    }
+  }
+  return "calculated";
+}
+
+export function setScoringModePreference(mode: "calculated" | "manual") {
+  localStorage.setItem(SCORING_MODE_KEY, mode);
+}
 
 export default function GameSetup() {
   const { createGame, gameState } = useGame();
@@ -19,6 +35,17 @@ export default function GameSetup() {
   const [playerCount, setPlayerCount] = useState<2 | 3 | 4>(2);
   const [playerNames, setPlayerNames] = useState<string[]>(["", "", "", ""]);
   const [dealerIndex, setDealerIndex] = useState<number>(0);
+  const [scoringMode, setScoringMode] = useState<"calculated" | "manual">("calculated");
+
+  useEffect(() => {
+    setScoringMode(getScoringModePreference());
+  }, []);
+
+  const handleScoringModeChange = (useManual: boolean) => {
+    const newMode = useManual ? "manual" : "calculated";
+    setScoringMode(newMode);
+    setScoringModePreference(newMode);
+  };
 
   const hasExistingGame = gameState !== null && gameState.gamePhase !== "complete";
 
@@ -60,8 +87,13 @@ export default function GameSetup() {
       <div className="max-w-lg mx-auto px-4 py-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-            <svg viewBox="0 0 24 24" className="h-8 w-8 text-primary" fill="currentColor">
-              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z"/>
+            <svg viewBox="0 0 24 24" className="h-8 w-8 text-primary" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="2" width="18" height="20" rx="2" />
+              <path d="M6 6h.01M9 6h.01M12 6h.01M6 9h.01M9 9h.01M12 9h.01M6 12h.01M9 12h.01M12 12h.01" strokeLinecap="round" />
+              <path d="M15 6h.01M18 6h.01M15 9h.01M18 9h.01M15 12h.01M18 12h.01" strokeLinecap="round" />
+              <path d="M6 15h.01M9 15h.01M12 15h.01M15 15h.01M18 15h.01" strokeLinecap="round" />
+              <path d="M6 18h.01M9 18h.01M12 18h.01M15 18h.01M18 18h.01" strokeLinecap="round" />
+              <path d="M3 14h18" strokeWidth="0.5" />
             </svg>
           </div>
           <h1 className="text-4xl font-bold tracking-tight mb-2">Cribbage</h1>
@@ -164,6 +196,35 @@ export default function GameSetup() {
             </div>
             <p className="text-sm text-muted-foreground">
               Click the circle icon to select the first dealer
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <Label className="flex items-center gap-2 text-base">
+              {scoringMode === "calculated" ? (
+                <Calculator className="h-4 w-4" />
+              ) : (
+                <Pencil className="h-4 w-4" />
+              )}
+              Default Scoring Mode
+            </Label>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-2">
+                <Calculator className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Card Entry (Auto-calculate)</span>
+              </div>
+              <Switch
+                checked={scoringMode === "manual"}
+                onCheckedChange={handleScoringModeChange}
+                data-testid="switch-scoring-mode"
+              />
+              <div className="flex items-center gap-2">
+                <span className="text-sm">Manual Entry</span>
+                <Pencil className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              You can always switch modes during the game
             </p>
           </div>
 

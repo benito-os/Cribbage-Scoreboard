@@ -18,6 +18,7 @@ import { useGame } from "@/lib/gameContext";
 import { ScoreEntryDialog, PeggingScoreDialog } from "@/components/score-entry-dialog";
 import { HandHistory } from "@/components/hand-history";
 import { PlayerReorderDialog } from "@/components/player-reorder-dialog";
+import { CribbageBoard } from "@/components/cribbage-board";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { Player, ScoreEntry, Card as CardType } from "@shared/schema";
 import { checkHisHeels } from "@shared/schema";
@@ -346,7 +347,6 @@ export default function ActiveGame() {
                 const isWinner = winnerId === player.id;
                 const isDealer = player.id === currentDealer?.id;
                 const isNextDealer = player.id === nextDealer?.id;
-                const progressPct = Math.min((player.score / targetScore) * 100, 100);
                 
                 return (
                   <Card
@@ -358,9 +358,6 @@ export default function ActiveGame() {
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        {index === 0 && !isWinner && (
-                          <span className="text-lg">👑</span>
-                        )}
                         {isWinner && (
                           <Trophy className="h-4 w-4 text-primary flex-shrink-0" />
                         )}
@@ -374,8 +371,7 @@ export default function ActiveGame() {
                       )}
                     </div>
                     <div className="text-2xl font-bold mb-1">{player.score}</div>
-                    <Progress value={progressPct} className="h-1.5" />
-                    <div className="text-xs text-muted-foreground mt-1">
+                    <div className="text-xs text-muted-foreground">
                       {targetScore - player.score > 0 
                         ? `${targetScore - player.score} to go`
                         : "Winner!"
@@ -385,6 +381,11 @@ export default function ActiveGame() {
                 );
               })}
             </div>
+          </section>
+
+          <section>
+            <h2 className="text-sm font-medium text-muted-foreground mb-2">Board</h2>
+            <CribbageBoard players={players} targetScore={targetScore} />
           </section>
 
           {hands.length > 0 && (
