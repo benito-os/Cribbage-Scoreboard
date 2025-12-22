@@ -24,13 +24,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <ThemedBackground />
-        <TooltipProvider>
-          <GameProvider>
-            <Toaster />
-            <Router />
-          </GameProvider>
-        </TooltipProvider>
+        <ThemedBackground>
+          <TooltipProvider>
+            <GameProvider>
+              <Toaster />
+              <Router />
+            </GameProvider>
+          </TooltipProvider>
+        </ThemedBackground>
       </ThemeProvider>
     </QueryClientProvider>
   );
