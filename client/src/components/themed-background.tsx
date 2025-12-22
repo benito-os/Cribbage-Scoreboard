@@ -1,6 +1,6 @@
 import { useTheme } from "./theme-provider";
 import casinoBg from "@assets/generated_images/luxury_casino_felt_texture.png";
-import badgersLogo from "@assets/generated_images/badgers_w_logo_style.png";
+import badgersLogo from "@assets/image_1766417176045.png";
 
 export function ThemedBackground() {
   const { theme } = useTheme();
@@ -32,7 +32,7 @@ export function ThemedBackground() {
         <img 
           src={badgersLogo} 
           alt="" 
-          className="w-80 h-80 opacity-15"
+          className="w-72 h-auto opacity-15"
         />
       </div>
     );
