@@ -136,7 +136,7 @@ export function CardSelector({
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1.5">
         {ranks.map((rank) => {
           const card: Card = { rank, suit: activeSuit };
           const selected = isCardSelected(card);
@@ -151,7 +151,7 @@ export function CardSelector({
               disabled={disabled}
               data-testid={`button-card-${rank}-${activeSuit}`}
               className={cn(
-                "h-10 rounded-md border-2 font-bold transition-all",
+                "h-9 min-w-0 rounded-md border-2 font-bold transition-all text-sm",
                 selected && "border-primary bg-primary/10",
                 !selected && !disabled && "border-border hover-elevate active-elevate-2",
                 disabled && !selected && "border-border/50 opacity-40 cursor-not-allowed",

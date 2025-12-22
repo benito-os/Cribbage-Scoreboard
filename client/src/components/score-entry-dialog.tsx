@@ -210,21 +210,32 @@ export function ScoreEntryDialog({
           </TabsContent>
 
           <TabsContent value="manual" className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="manual-score">Points</Label>
-              <Input
-                id="manual-score"
-                type="number"
-                min="0"
-                max="29"
-                placeholder="Enter score (0-29)"
-                value={manualScore}
-                onChange={(e) => setManualScore(e.target.value)}
-                data-testid="input-manual-score"
-              />
-              <p className="text-sm text-muted-foreground">
-                Enter the total points for this {isCrib ? "crib" : "hand"}.
-                Maximum possible is 29 points.
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Points</Label>
+                <div className="text-2xl font-bold tabular-nums min-w-[3ch] text-right">
+                  {manualScore || "0"}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-6 gap-1">
+                {Array.from({ length: 30 }, (_, i) => i).map((num) => (
+                  <Button
+                    key={num}
+                    type="button"
+                    variant={manualScore === num.toString() ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setManualScore(num.toString())}
+                    data-testid={`button-score-${num}`}
+                    className="h-8 text-xs font-medium px-0"
+                  >
+                    {num}
+                  </Button>
+                ))}
+              </div>
+              
+              <p className="text-xs text-muted-foreground text-center">
+                Tap a number to set the score (max 29)
               </p>
             </div>
           </TabsContent>
@@ -266,24 +277,38 @@ export function PeggingScoreDialog({
   players,
   onSubmit,
 }: PeggingScoreDialogProps) {
-  const [scores, setScores] = useState<Record<string, string>>({});
+  const [scores, setScores] = useState<Record<string, number>>({});
+  const [activePlayer, setActivePlayer] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      const initial: Record<string, string> = {};
-      players.forEach(p => { initial[p.id] = "0"; });
+      const initial: Record<string, number> = {};
+      players.forEach(p => { initial[p.id] = 0; });
       setScores(initial);
+      setActivePlayer(players[0]?.id ?? null);
     }
   }, [open, players]);
 
   const handleSubmit = () => {
-    const numericScores: Record<string, number> = {};
-    for (const [id, score] of Object.entries(scores)) {
-      numericScores[id] = parseInt(score) || 0;
-    }
-    onSubmit(numericScores);
+    onSubmit(scores);
     onOpenChange(false);
   };
+
+  const adjustScore = (playerId: string, delta: number) => {
+    setScores(prev => ({
+      ...prev,
+      [playerId]: Math.max(0, Math.min(31, (prev[playerId] ?? 0) + delta))
+    }));
+  };
+
+  const setScore = (playerId: string, value: number) => {
+    setScores(prev => ({
+      ...prev,
+      [playerId]: Math.max(0, Math.min(31, value))
+    }));
+  };
+
+  const quickButtons = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -291,27 +316,69 @@ export function PeggingScoreDialog({
         <DialogHeader>
           <DialogTitle>Pegging Scores</DialogTitle>
           <DialogDescription>
-            Enter points earned during the play phase
+            Tap a player, then tap a number to set their score
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          {players.map((player) => (
-            <div key={player.id} className="flex items-center justify-between gap-4">
-              <Label htmlFor={`peg-${player.id}`} className="flex-1">
-                {player.name}
-              </Label>
-              <Input
-                id={`peg-${player.id}`}
-                type="number"
-                min="0"
-                className="w-20"
-                value={scores[player.id] ?? "0"}
-                onChange={(e) => setScores({ ...scores, [player.id]: e.target.value })}
-                data-testid={`input-pegging-${player.id}`}
-              />
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            {players.map((player) => (
+              <Button
+                key={player.id}
+                type="button"
+                variant={activePlayer === player.id ? "default" : "outline"}
+                onClick={() => setActivePlayer(player.id)}
+                className="flex items-center justify-between gap-2 h-auto py-2 px-3"
+                data-testid={`button-select-player-${player.id}`}
+              >
+                <span className="truncate">{player.name}</span>
+                <span className="text-lg font-bold tabular-nums">{scores[player.id] ?? 0}</span>
+              </Button>
+            ))}
+          </div>
+
+          {activePlayer && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-6 gap-1.5">
+                {quickButtons.map((num) => (
+                  <Button
+                    key={num}
+                    type="button"
+                    variant={scores[activePlayer] === num ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => setScore(activePlayer, num)}
+                    data-testid={`button-peg-${num}`}
+                    className="h-9 text-sm font-medium"
+                  >
+                    {num}
+                  </Button>
+                ))}
+              </div>
+              
+              <div className="flex gap-2 justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => adjustScore(activePlayer, -1)}
+                  data-testid="button-peg-minus"
+                  className="w-16"
+                >
+                  -1
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => adjustScore(activePlayer, 1)}
+                  data-testid="button-peg-plus"
+                  className="w-16"
+                >
+                  +1
+                </Button>
+              </div>
             </div>
-          ))}
+          )}
         </div>
 
         <DialogFooter>
