@@ -21,7 +21,7 @@ import { PlayerReorderDialog } from "@/components/player-reorder-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SuitIcon } from "@/components/suit-icon";
 import { Badge } from "@/components/ui/badge";
-import type { PlayerTricks, Player } from "@shared/schema";
+import type { PlayerTricks, Player, PlayerParticipation } from "@shared/schema";
 import {
   Undo2,
   Plus,
@@ -73,8 +73,8 @@ export default function ActiveGame() {
     setShowResultDialog(true);
   };
 
-  const handleResultSubmit = (playerTricks: PlayerTricks) => {
-    submitRoundResult(playerTricks);
+  const handleResultSubmit = (playerTricks: PlayerTricks, playerParticipation?: PlayerParticipation) => {
+    submitRoundResult(playerTricks, playerParticipation);
     setShowResultDialog(false);
   };
 
