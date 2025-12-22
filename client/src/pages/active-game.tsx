@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,38 +15,46 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useGame } from "@/lib/gameContext";
-import { PlayerScoreCard } from "@/components/player-score-card";
-import { RoundHistory } from "@/components/round-history";
-import { BidDialog } from "@/components/bid-dialog";
-import { RoundResultDialog } from "@/components/round-result-dialog";
+import { ScoreEntryDialog, PeggingScoreDialog } from "@/components/score-entry-dialog";
+import { HandHistory } from "@/components/hand-history";
 import { PlayerReorderDialog } from "@/components/player-reorder-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SuitIcon } from "@/components/suit-icon";
-import { Badge } from "@/components/ui/badge";
-import type { PlayerTricks, Player, PlayerParticipation } from "@shared/schema";
+import type { Player, ScoreEntry, Card as CardType } from "@shared/schema";
+import { checkHisHeels } from "@shared/schema";
 import {
   Undo2,
   Redo2,
-  Plus,
   RotateCcw,
   Home,
   Trophy,
-  Check,
-  Flame,
   ArrowUpDown,
   CircleDot,
-  X,
-  Ban,
+  Play,
+  Calculator,
+  Crown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function ActiveGame() {
-  const { gameState, submitBid, submitRoundResult, undoLastRound, redoRound, resetGame, reorderPlayers, canUndo, canRedo } =
-    useGame();
+  const { 
+    gameState, 
+    submitPeggingScores, 
+    submitHandScore, 
+    submitCribScore, 
+    finishHand,
+    undoLastHand, 
+    redoHand, 
+    resetGame, 
+    reorderPlayers, 
+    canUndo, 
+    canRedo 
+  } = useGame();
   const [, setLocation] = useLocation();
 
-  const [showBidDialog, setShowBidDialog] = useState(false);
-  const [showResultDialog, setShowResultDialog] = useState(false);
+  const [showPeggingDialog, setShowPeggingDialog] = useState(false);
+  const [showScoreDialog, setShowScoreDialog] = useState(false);
+  const [scoreDialogPlayer, setScoreDialogPlayer] = useState<Player | null>(null);
+  const [isScoringCrib, setIsScoringCrib] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showReorderDialog, setShowReorderDialog] = useState(false);
 
@@ -53,40 +63,66 @@ export default function ActiveGame() {
     return null;
   }
 
-  const { players, targetScore, rounds, gamePhase, currentBid, winnerId, playerCount, currentDealerIndex } =
-    gameState;
+  const { players, targetScore, hands, gamePhase, currentHand, winnerId, playerCount, currentDealerIndex } = gameState;
 
   const rankedPlayers = [...players].sort((a, b) => b.score - a.score);
-  const lastRound = rounds.length > 0 ? rounds[rounds.length - 1] : null;
   const currentDealer = players[currentDealerIndex];
   const nextDealerIndex = (currentDealerIndex + 1) % playerCount;
   const nextDealer = players[nextDealerIndex];
 
-  const handleNewRound = () => {
-    setShowBidDialog(true);
+  const hasPeggingScores = currentHand?.peggingScores && Object.keys(currentHand.peggingScores).length > 0;
+  const handScoresEntered = currentHand?.handScores?.length ?? 0;
+  const hasCribScore = !!currentHand?.cribScore;
+  const allHandsScored = handScoresEntered >= playerCount;
+  const handComplete = allHandsScored && hasCribScore;
+
+  const getNextPlayerToScore = (): Player | null => {
+    if (!hasPeggingScores) return null;
+    
+    const scoredPlayerIds = new Set(currentHand?.handScores?.map(s => s.playerId) ?? []);
+    
+    const orderFromDealer: Player[] = [];
+    for (let i = 1; i <= playerCount; i++) {
+      const idx = (currentDealerIndex + i) % playerCount;
+      orderFromDealer.push(players[idx]);
+    }
+    
+    return orderFromDealer.find(p => !scoredPlayerIds.has(p.id)) ?? null;
   };
 
-  const handleBidSubmit = (
-    bidderId: string,
-    amount: number,
-    type: "standard" | "pepper",
-    trumpSuit: "spades" | "hearts" | "diamonds" | "clubs" | "none"
-  ) => {
-    submitBid(bidderId, amount, type, trumpSuit);
-    setShowResultDialog(true);
+  const nextPlayerToScore = getNextPlayerToScore();
+
+  const handlePeggingSubmit = (scores: Record<string, number>) => {
+    submitPeggingScores(scores);
+    setShowPeggingDialog(false);
   };
 
-  const handleResultSubmit = (playerTricks: PlayerTricks, playerParticipation?: PlayerParticipation) => {
-    submitRoundResult(playerTricks, playerParticipation);
-    setShowResultDialog(false);
+  const handleOpenScoreDialog = (player: Player, isCrib: boolean) => {
+    setScoreDialogPlayer(player);
+    setIsScoringCrib(isCrib);
+    setShowScoreDialog(true);
+  };
+
+  const handleScoreSubmit = (entry: ScoreEntry) => {
+    if (isScoringCrib) {
+      submitCribScore(entry);
+    } else {
+      submitHandScore(entry);
+    }
+    setShowScoreDialog(false);
+    setScoreDialogPlayer(null);
+  };
+
+  const handleFinishHand = () => {
+    finishHand();
   };
 
   const handleUndo = () => {
-    undoLastRound();
+    undoLastHand();
   };
 
   const handleRedo = () => {
-    redoRound();
+    redoHand();
   };
 
   const handleReset = () => {
@@ -106,27 +142,17 @@ export default function ActiveGame() {
 
   const winner = players.find((p) => p.id === winnerId);
 
-  const getBidLabel = () => {
-    if (!currentBid) return "";
-    if (currentBid.type === "pepper") return "Pepper";
-    return `Bid ${currentBid.amount}`;
+  const getHandScoreForPlayer = (playerId: string): number | null => {
+    const entry = currentHand?.handScores?.find(s => s.playerId === playerId);
+    return entry?.points ?? null;
   };
 
-  const getLastRoundSummary = () => {
-    if (!lastRound) return null;
-    const bidder = players.find(p => p.id === lastRound.bidderId);
-    return {
-      bidder,
-      success: lastRound.bidSuccess,
-      scoreChanges: lastRound.scoreChanges,
-    };
+  const getCribScoreForDealer = (): number | null => {
+    return currentHand?.cribScore?.points ?? null;
   };
-
-  const lastRoundSummary = getLastRoundSummary();
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Compact Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="max-w-2xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -139,7 +165,7 @@ export default function ActiveGame() {
               <Home className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="font-semibold">Round {rounds.length + 1}</h1>
+              <h1 className="font-semibold">Hand {hands.length + 1}</h1>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <CircleDot className="h-3 w-3" />
                 <span>{currentDealer?.name} deals</span>
@@ -181,10 +207,8 @@ export default function ActiveGame() {
         </div>
       </header>
 
-      {/* Main Content - scrollable */}
       <main className="flex-1 overflow-y-auto pb-24">
         <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
-          {/* Winner Banner */}
           {gamePhase === "complete" && winner && (
             <Card className="p-6 text-center bg-primary/5 border-primary">
               <Trophy className="h-12 w-12 text-primary mx-auto mb-3" />
@@ -199,73 +223,114 @@ export default function ActiveGame() {
             </Card>
           )}
 
-          {/* Last Round Summary - Inline compact display */}
-          {lastRoundSummary && gamePhase !== "complete" && (
-            <div className={cn(
-              "rounded-lg px-3 py-2 text-sm flex items-center justify-between gap-2 flex-wrap",
-              lastRoundSummary.success 
-                ? "bg-primary/10 text-primary" 
-                : "bg-destructive/10 text-destructive"
-            )}>
-              <div className="flex items-center gap-1.5">
-                {lastRoundSummary.success ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  <X className="h-4 w-4" />
-                )}
-                <span className="font-medium">
-                  {lastRoundSummary.bidder?.name} {lastRoundSummary.success ? "made" : "missed"}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2 text-xs">
-                {players.map(p => {
-                  const change = lastRoundSummary.scoreChanges?.[p.id] ?? 0;
-                  if (change === 0) return null;
-                  return (
-                    <span key={p.id} className="text-foreground">
-                      {p.name.split(' ')[0]}: {change > 0 ? '+' : ''}{change}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Current Bid Status */}
-          {gamePhase === "playing" && currentBid?.bidderId && (
+          {gamePhase === "pegging" && (
             <Card className="p-4">
               <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-chart-4/10 flex items-center justify-center">
-                    <Flame className="h-5 w-5 text-chart-4" />
-                  </div>
-                  <div>
-                    <p className="font-medium">
-                      {players.find((p) => p.id === currentBid.bidderId)?.name}
-                    </p>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <span>{getBidLabel()}</span>
-                      {currentBid.trumpSuit === "none" ? (
-                        <Ban className="h-4 w-4" />
-                      ) : currentBid.trumpSuit && (
-                        <SuitIcon suit={currentBid.trumpSuit} size="sm" />
-                      )}
-                    </div>
-                  </div>
+                <div>
+                  <h3 className="font-medium">Pegging Phase</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Play cards and track pegging points
+                  </p>
                 </div>
                 <Button
-                  onClick={() => setShowResultDialog(true)}
+                  onClick={() => setShowPeggingDialog(true)}
                   className="gap-2"
-                  data-testid="button-enter-result"
+                  data-testid="button-enter-pegging"
                 >
-                  <Check className="h-4 w-4" />
-                  Enter Tricks
+                  <Play className="h-4 w-4" />
+                  Enter Pegging
                 </Button>
               </div>
             </Card>
           )}
 
-          {/* Scoreboard */}
+          {gamePhase === "counting" && (
+            <Card className="p-4 space-y-4">
+              <div>
+                <h3 className="font-medium mb-1">Counting Phase</h3>
+                <p className="text-sm text-muted-foreground">
+                  Score each hand, then the crib
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {players
+                  .map((_, idx) => players[(currentDealerIndex + idx + 1) % playerCount])
+                  .map((player) => {
+                    const score = getHandScoreForPlayer(player.id);
+                    const isDealer = player.id === currentDealer?.id;
+                    return (
+                      <div
+                        key={player.id}
+                        className={cn(
+                          "flex items-center justify-between p-2 rounded-md",
+                          score !== null ? "bg-primary/5" : "bg-muted/50"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{player.name}</span>
+                          {isDealer && (
+                            <Badge variant="outline" className="text-xs">Dealer</Badge>
+                          )}
+                        </div>
+                        {score !== null ? (
+                          <Badge>{score} pts</Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenScoreDialog(player, false)}
+                            disabled={nextPlayerToScore?.id !== player.id}
+                            data-testid={`button-score-${player.id}`}
+                          >
+                            <Calculator className="h-4 w-4 mr-1" />
+                            Score Hand
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                <div
+                  className={cn(
+                    "flex items-center justify-between p-2 rounded-md border-2 border-dashed",
+                    hasCribScore ? "bg-primary/5 border-primary/30" : "border-border"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <Crown className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{currentDealer?.name}'s Crib</span>
+                  </div>
+                  {hasCribScore ? (
+                    <Badge>{currentHand?.cribScore?.points} pts</Badge>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => currentDealer && handleOpenScoreDialog(currentDealer, true)}
+                      disabled={!allHandsScored}
+                      data-testid="button-score-crib"
+                    >
+                      <Calculator className="h-4 w-4 mr-1" />
+                      Score Crib
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {handComplete && (
+                <Button
+                  onClick={handleFinishHand}
+                  className="w-full gap-2"
+                  data-testid="button-finish-hand"
+                >
+                  <Play className="h-4 w-4" />
+                  Start Next Hand
+                </Button>
+              )}
+            </Card>
+          )}
+
           <section>
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-medium text-muted-foreground">Scores</h2>
@@ -274,28 +339,58 @@ export default function ActiveGame() {
             <div
               className={cn(
                 "grid gap-3",
-                playerCount === 3 ? "grid-cols-3" : "grid-cols-2"
+                playerCount === 2 ? "grid-cols-2" : playerCount === 3 ? "grid-cols-3" : "grid-cols-2"
               )}
             >
-              {rankedPlayers.map((player, index) => (
-                <PlayerScoreCard
-                  key={player.id}
-                  player={player}
-                  targetScore={targetScore}
-                  isCurrentBidder={currentBid?.bidderId === player.id}
-                  isWinner={winnerId === player.id}
-                  isNextDealer={player.id === nextDealer?.id}
-                  rank={index + 1}
-                />
-              ))}
+              {rankedPlayers.map((player, index) => {
+                const isWinner = winnerId === player.id;
+                const isDealer = player.id === currentDealer?.id;
+                const isNextDealer = player.id === nextDealer?.id;
+                const progressPct = Math.min((player.score / targetScore) * 100, 100);
+                
+                return (
+                  <Card
+                    key={player.id}
+                    className={cn(
+                      "p-3 relative",
+                      isWinner && "border-primary bg-primary/5"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        {index === 0 && !isWinner && (
+                          <span className="text-lg">👑</span>
+                        )}
+                        {isWinner && (
+                          <Trophy className="h-4 w-4 text-primary flex-shrink-0" />
+                        )}
+                        <span className="font-medium truncate">{player.name}</span>
+                      </div>
+                      {isDealer && (
+                        <Badge variant="secondary" className="text-xs flex-shrink-0">D</Badge>
+                      )}
+                      {isNextDealer && !isDealer && (
+                        <Badge variant="outline" className="text-xs flex-shrink-0">Next</Badge>
+                      )}
+                    </div>
+                    <div className="text-2xl font-bold mb-1">{player.score}</div>
+                    <Progress value={progressPct} className="h-1.5" />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {targetScore - player.score > 0 
+                        ? `${targetScore - player.score} to go`
+                        : "Winner!"
+                      }
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           </section>
 
-          {/* Round History - Collapsible */}
-          {rounds.length > 0 && (
+          {hands.length > 0 && (
             <section>
-              <RoundHistory
-                rounds={rounds}
+              <HandHistory
+                hands={hands}
                 players={players}
                 maxHeight="300px"
               />
@@ -304,38 +399,25 @@ export default function ActiveGame() {
         </div>
       </main>
 
-      {/* Fixed Bottom Action Bar - Thumb zone */}
-      {gamePhase === "bidding" && (
-        <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t p-4 z-40">
-          <div className="max-w-2xl mx-auto">
-            <Button
-              onClick={handleNewRound}
-              className="w-full h-14 text-lg gap-2"
-              data-testid="button-new-round"
-            >
-              <Plus className="h-5 w-5" />
-              Enter Bid
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Dialogs */}
-      <BidDialog
-        open={showBidDialog}
-        onClose={() => setShowBidDialog(false)}
-        onSubmit={handleBidSubmit}
+      <PeggingScoreDialog
+        open={showPeggingDialog}
+        onOpenChange={setShowPeggingDialog}
         players={players}
-        playerCount={playerCount}
-        currentDealerIndex={currentDealerIndex}
+        onSubmit={handlePeggingSubmit}
       />
 
-      <RoundResultDialog
-        open={showResultDialog}
-        onClose={() => setShowResultDialog(false)}
-        onSubmit={handleResultSubmit}
-        gameState={gameState}
-      />
+      {scoreDialogPlayer && (
+        <ScoreEntryDialog
+          open={showScoreDialog}
+          onOpenChange={setShowScoreDialog}
+          playerName={scoreDialogPlayer.name}
+          playerId={scoreDialogPlayer.id}
+          isCrib={isScoringCrib}
+          starterCard={currentHand?.starterCard}
+          onSubmit={handleScoreSubmit}
+          existingHandCards={currentHand?.handScores?.flatMap(s => s.cards ?? []) ?? []}
+        />
+      )}
 
       <PlayerReorderDialog
         open={showReorderDialog}

@@ -1,16 +1,20 @@
-# Pepper Scorekeeper
+# Cribbage Scorekeeper
 
-A scorekeeping application for the Pepper card game, a classic Midwestern trick-taking game similar to Euchre.
+A scorekeeping application for the Cribbage card game, the classic pegging and counting game.
 
 ## Overview
 
-This app helps players track scores during in-person Pepper card games. It handles:
-- 3 or 4 player games with appropriate target scores (32 for 3 players, 25 for 4 players)
-- Bidding (1-6 for 4 players, 1-8 for 3 players, plus Pepper and Pepper No special bids)
-- Trump suit selection
-- Round results with automatic score calculation
-- Round history with undo capability
+This app helps players track scores during in-person Cribbage games. It handles:
+- 2, 3, or 4 player games with a target score of 121 points
+- Pegging phase score entry
+- Hand scoring with two modes:
+  - **Card Entry Mode**: Select the 4 hand cards + starter card, app auto-calculates score with detailed breakdown (fifteens, pairs, runs, flushes, nobs)
+  - **Manual Mode**: Just enter the point value directly
+- Score editing before submission in case the calculation is wrong
+- Crib scoring for the dealer
+- Hand history with undo/redo capability
 - Auto-save to localStorage
+- Skunk and double-skunk tracking
 
 ## Technical Architecture
 
@@ -22,22 +26,43 @@ This app helps players track scores during in-person Pepper card games. It handl
 
 ### Key Files
 - `client/src/lib/gameContext.tsx` - Game state management and persistence
+- `client/src/lib/playerProfilesContext.tsx` - Player profiles and statistics
 - `client/src/pages/game-setup.tsx` - Initial setup screen
-- `client/src/pages/active-game.tsx` - Main game screen
-- `client/src/components/` - UI components (BidDialog, RoundResultDialog, PlayerScoreCard, etc.)
-- `shared/schema.ts` - TypeScript types and game logic helpers
+- `client/src/pages/active-game.tsx` - Main game screen with scoring phases
+- `client/src/components/card-selector.tsx` - Card selection UI for entering hands
+- `client/src/components/score-entry-dialog.tsx` - Score entry with auto-calculation and manual modes
+- `client/src/components/score-breakdown.tsx` - Visual breakdown of scoring combinations
+- `shared/schema.ts` - TypeScript types and Cribbage scoring logic
 
 ### Backend
 - Minimal Express server serving the React frontend
 - No API endpoints needed - all game state is client-side
 
-## Game Rules Summary
+## Cribbage Scoring Summary
 
-1. **Bidding**: Players bid tricks (1-8 for 3 players, 1-6 for 4 players)
-2. **Pepper**: Special bid of 9 (3-player) or 7 (4-player) with trump
-3. **Pepper No**: Same as Pepper but with no trump suit
-4. **Scoring**: Make bid = +bid points, Miss bid = -bid points
-5. **Winning**: First to reach target score (32 for 3 players, 25 for 4 players)
+### During Play (Pegging)
+- Fifteen: 2 points
+- Pair: 2 points
+- Three of a kind: 6 points
+- Four of a kind: 12 points
+- Run (3+ cards): 1 point per card
+- 31: 2 points
+- Go/Last card: 1 point
+
+### Counting Hands/Crib
+- Fifteen (any combo summing to 15): 2 points each
+- Pair: 2 points
+- Three of a kind: 6 points
+- Four of a kind: 12 points
+- Run (3+ consecutive cards): 1 point per card
+- Flush (4 in hand): 4 points (5 if starter matches)
+- Nobs (Jack matching starter suit): 1 point
+- Maximum possible hand: 29 points
+
+### Winning
+- First to 121 points wins
+- Skunk: Winner reaches 121 while opponent is under 91
+- Double Skunk: Winner reaches 121 while opponent is under 61
 
 ## Running the App
 

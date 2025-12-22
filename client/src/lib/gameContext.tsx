@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
-import type { GameState, Player, Round, TrumpSuit, BidType, PlayerTricks, PlayerParticipation } from "@shared/schema";
-import { getTargetScore, calculateAllScoreChanges, getPepperBid } from "@shared/schema";
+import type { GameState, Player, HandResult, Card, ScoreEntry, GamePhase } from "@shared/schema";
+import { getTargetScore, getSkunkStatus } from "@shared/schema";
 
-const STORAGE_KEY = "pepper-game-state";
+const STORAGE_KEY = "cribbage-game-state";
 
 interface PlayerInput {
   name: string;
@@ -11,12 +11,14 @@ interface PlayerInput {
 
 interface GameContextType {
   gameState: GameState | null;
-  createGame: (playerCount: 3 | 4, players: PlayerInput[], dealerIndex: number) => void;
-  startBidding: () => void;
-  submitBid: (bidderId: string, amount: number, type: BidType, trumpSuit: TrumpSuit) => void;
-  submitRoundResult: (playerTricks: PlayerTricks, playerParticipation?: PlayerParticipation) => void;
-  undoLastRound: () => void;
-  redoRound: () => void;
+  createGame: (playerCount: 2 | 3 | 4, players: PlayerInput[], dealerIndex: number) => void;
+  setStarterCard: (card: Card) => void;
+  submitPeggingScores: (scores: Record<string, number>) => void;
+  submitHandScore: (entry: ScoreEntry) => void;
+  submitCribScore: (entry: ScoreEntry) => void;
+  finishHand: () => void;
+  undoLastHand: () => void;
+  redoHand: () => void;
   resetGame: () => void;
   reorderPlayers: (newOrder: Player[]) => void;
   getPlayer: (id: string) => Player | undefined;
@@ -56,27 +58,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return null;
   });
 
-  // Redo stack for undone rounds
   const [redoStack, setRedoStack] = useState<{
-    round: Round;
+    hand: HandResult;
     dealerIndex: number;
     playerScores: Record<string, number>;
   }[]>([]);
 
-  // Callback for when game completes
   const [onGameComplete, setOnGameComplete] = useState<((completedGame: GameState | null) => void) | null>(null);
-
-  // Track which game IDs have been processed for completion
   const [processedGameIds, setProcessedGameIds] = useState<Set<string>>(new Set());
 
-  // Persist state to localStorage
   useEffect(() => {
     if (gameState) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
     }
   }, [gameState]);
 
-  // Detect game completion and trigger callback
   useEffect(() => {
     if (
       gameState?.gamePhase === "complete" && 
@@ -89,7 +85,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [gameState?.gamePhase, gameState?.id, processedGameIds, onGameComplete]);
 
-  const createGame = useCallback((playerCount: 3 | 4, playerInputs: PlayerInput[], dealerIndex: number) => {
+  const createGame = useCallback((playerCount: 2 | 3 | 4, playerInputs: PlayerInput[], dealerIndex: number) => {
     const players: Player[] = playerInputs.map((input, index) => ({
       id: generateId(),
       name: input.name,
@@ -101,115 +97,187 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const newGame: GameState = {
       id: generateId(),
       playerCount,
-      targetScore: getTargetScore(playerCount),
+      targetScore: getTargetScore(),
       players,
-      rounds: [],
+      hands: [],
       currentDealerIndex: dealerIndex,
-      gamePhase: "bidding",
+      gamePhase: "pegging",
+      currentHand: {
+        peggingScores: {},
+        handScores: [],
+      },
     };
 
     setGameState(newGame);
-    // Clear redo stack and processed games for new game
     setRedoStack([]);
     setProcessedGameIds(new Set());
   }, []);
 
-  const startBidding = useCallback(() => {
-    setGameState(prev => prev ? { ...prev, gamePhase: "bidding", currentBid: undefined } : null);
-  }, []);
-
-  const submitBid = useCallback((bidderId: string, amount: number, type: BidType, trumpSuit: TrumpSuit) => {
+  const setStarterCard = useCallback((card: Card) => {
     setGameState(prev => {
       if (!prev) return null;
       return {
         ...prev,
-        gamePhase: "playing",
-        currentBid: {
-          bidderId,
-          amount,
-          type,
-          trumpSuit,
+        currentHand: {
+          ...prev.currentHand,
+          starterCard: card,
         },
       };
     });
   }, []);
 
-  const submitRoundResult = useCallback((playerTricks: PlayerTricks, playerParticipation?: PlayerParticipation) => {
+  const submitPeggingScores = useCallback((scores: Record<string, number>) => {
     setGameState(prev => {
-      if (!prev || !prev.currentBid?.bidderId) return prev;
-
-      const { bidderId, amount, type, trumpSuit } = prev.currentBid;
-      const effectiveAmount = type === "standard" ? amount! : getPepperBid(prev.playerCount);
+      if (!prev) return null;
       
-      const { success, scoreChanges } = calculateAllScoreChanges(
-        bidderId,
-        amount!,
-        type!,
-        playerTricks,
-        prev.playerCount,
-        trumpSuit,
-        playerParticipation
-      );
-
-      const newRound: Round = {
-        id: generateId(),
-        roundNumber: prev.rounds.length + 1,
-        dealerId: prev.players[prev.currentDealerIndex].id,
-        bidderId,
-        bidAmount: effectiveAmount,
-        bidType: type!,
-        trumpSuit: trumpSuit!,
-        playerTricks,
-        playerParticipation,
-        bidSuccess: success,
-        scoreChanges,
-      };
-
-      // Update all player scores
+      // Apply pegging scores immediately to check for winner during pegging
       const updatedPlayers = prev.players.map(player => ({
         ...player,
-        score: player.score + (scoreChanges[player.id] ?? 0),
+        score: player.score + (scores[player.id] ?? 0),
       }));
 
-      // Check for winner (highest score if multiple reach target)
+      // Check for winner
       const winners = updatedPlayers.filter(p => p.score >= prev.targetScore);
       const winner = winners.length > 0 
         ? winners.reduce((a, b) => a.score >= b.score ? a : b)
         : null;
 
-      // Rotate dealer
-      const nextDealerIndex = (prev.currentDealerIndex + 1) % prev.playerCount;
-      const playersWithDealer = updatedPlayers.map((p, i) => ({
-        ...p,
-        isDealer: i === nextDealerIndex,
-      }));
-
-      // Clear redo stack when a new round is submitted
-      setRedoStack([]);
-
       return {
         ...prev,
-        players: playersWithDealer,
-        rounds: [...prev.rounds, newRound],
-        currentDealerIndex: nextDealerIndex,
-        gamePhase: winner ? "complete" : "bidding",
-        currentBid: undefined,
+        players: updatedPlayers,
+        currentHand: {
+          ...prev.currentHand,
+          peggingScores: scores,
+        },
+        gamePhase: winner ? "complete" : "counting",
         winnerId: winner?.id,
       };
     });
   }, []);
 
-  const undoLastRound = useCallback(() => {
+  const submitHandScore = useCallback((entry: ScoreEntry) => {
     setGameState(prev => {
-      if (!prev || prev.rounds.length === 0) return prev;
-
-      const lastRound = prev.rounds[prev.rounds.length - 1];
+      if (!prev) return null;
       
-      // Save to redo stack before removing
+      // Apply hand score immediately
+      const updatedPlayers = prev.players.map(player => {
+        if (player.id === entry.playerId) {
+          return { ...player, score: player.score + entry.points };
+        }
+        return player;
+      });
+
+      // Check for winner
+      const winners = updatedPlayers.filter(p => p.score >= prev.targetScore);
+      const winner = winners.length > 0 
+        ? winners.reduce((a, b) => a.score >= b.score ? a : b)
+        : null;
+
+      const existingScores = prev.currentHand?.handScores ?? [];
+      
+      return {
+        ...prev,
+        players: updatedPlayers,
+        currentHand: {
+          ...prev.currentHand,
+          handScores: [...existingScores, entry],
+        },
+        gamePhase: winner ? "complete" : prev.gamePhase,
+        winnerId: winner?.id,
+      };
+    });
+  }, []);
+
+  const submitCribScore = useCallback((entry: ScoreEntry) => {
+    setGameState(prev => {
+      if (!prev) return null;
+      
+      // Apply crib score
+      const updatedPlayers = prev.players.map(player => {
+        if (player.id === entry.playerId) {
+          return { ...player, score: player.score + entry.points };
+        }
+        return player;
+      });
+
+      // Check for winner
+      const winners = updatedPlayers.filter(p => p.score >= prev.targetScore);
+      const winner = winners.length > 0 
+        ? winners.reduce((a, b) => a.score >= b.score ? a : b)
+        : null;
+
+      return {
+        ...prev,
+        players: updatedPlayers,
+        currentHand: {
+          ...prev.currentHand,
+          cribScore: entry,
+        },
+        gamePhase: winner ? "complete" : prev.gamePhase,
+        winnerId: winner?.id,
+      };
+    });
+  }, []);
+
+  const finishHand = useCallback(() => {
+    setGameState(prev => {
+      if (!prev || !prev.currentHand) return prev;
+
+      const { peggingScores, handScores, cribScore, starterCard } = prev.currentHand;
+      
+      // Calculate total score changes for this hand
+      const scoreChanges: Record<string, number> = {};
+      for (const player of prev.players) {
+        scoreChanges[player.id] = 
+          (peggingScores?.[player.id] ?? 0) +
+          (handScores?.find(s => s.playerId === player.id)?.points ?? 0) +
+          (cribScore?.playerId === player.id ? cribScore.points : 0);
+      }
+
+      const newHand: HandResult = {
+        id: generateId(),
+        handNumber: prev.hands.length + 1,
+        dealerId: prev.players[prev.currentDealerIndex].id,
+        starterCard,
+        peggingScores: peggingScores ?? {},
+        handScores: handScores ?? [],
+        cribScore,
+        scoreChanges,
+      };
+
+      // Rotate dealer
+      const nextDealerIndex = (prev.currentDealerIndex + 1) % prev.playerCount;
+      const playersWithDealer = prev.players.map((p, i) => ({
+        ...p,
+        isDealer: i === nextDealerIndex,
+      }));
+
+      setRedoStack([]);
+
+      return {
+        ...prev,
+        players: playersWithDealer,
+        hands: [...prev.hands, newHand],
+        currentDealerIndex: nextDealerIndex,
+        gamePhase: "pegging",
+        currentHand: {
+          peggingScores: {},
+          handScores: [],
+        },
+      };
+    });
+  }, []);
+
+  const undoLastHand = useCallback(() => {
+    setGameState(prev => {
+      if (!prev || prev.hands.length === 0) return prev;
+
+      const lastHand = prev.hands[prev.hands.length - 1];
+      
       const playerScores: Record<string, number> = {};
       prev.players.forEach(p => { playerScores[p.id] = p.score; });
       setRedoStack(stack => [...stack, {
-        round: lastRound,
+        hand: lastHand,
         dealerIndex: prev.currentDealerIndex,
         playerScores,
       }]);
@@ -217,7 +285,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       // Reverse all score changes
       const updatedPlayers = prev.players.map(player => ({
         ...player,
-        score: player.score - (lastRound.scoreChanges[player.id] ?? 0),
+        score: player.score - (lastHand.scoreChanges[player.id] ?? 0),
       }));
 
       // Restore previous dealer
@@ -230,15 +298,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
       return {
         ...prev,
         players: playersWithDealer,
-        rounds: prev.rounds.slice(0, -1),
+        hands: prev.hands.slice(0, -1),
         currentDealerIndex: prevDealerIndex,
-        gamePhase: "bidding",
+        gamePhase: "pegging",
+        currentHand: {
+          peggingScores: {},
+          handScores: [],
+        },
         winnerId: undefined,
       };
     });
   }, []);
 
-  const redoRound = useCallback(() => {
+  const redoHand = useCallback(() => {
     if (redoStack.length === 0) return;
 
     const lastUndo = redoStack[redoStack.length - 1];
@@ -247,16 +319,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setGameState(prev => {
       if (!prev) return prev;
 
-      const { round, dealerIndex, playerScores } = lastUndo;
+      const { hand, dealerIndex, playerScores } = lastUndo;
 
-      // Restore player scores and dealer flag based on stored dealerIndex
       const updatedPlayers = prev.players.map((player, idx) => ({
         ...player,
         score: playerScores[player.id] ?? player.score,
         isDealer: idx === dealerIndex,
       }));
 
-      // Check for winner
       const winners = updatedPlayers.filter(p => p.score >= prev.targetScore);
       const winner = winners.length > 0 
         ? winners.reduce((a, b) => a.score >= b.score ? a : b)
@@ -265,9 +335,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
       return {
         ...prev,
         players: updatedPlayers,
-        rounds: [...prev.rounds, round],
+        hands: [...prev.hands, hand],
         currentDealerIndex: dealerIndex,
-        gamePhase: winner ? "complete" : "bidding",
+        gamePhase: winner ? "complete" : "pegging",
         winnerId: winner?.id,
       };
     });
@@ -277,13 +347,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setGameState(prev => {
       if (!prev) return prev;
       
-      // Find the current dealer's ID
       const currentDealerId = prev.players[prev.currentDealerIndex]?.id;
-      
-      // Find the new index of the dealer
       const newDealerIndex = newOrder.findIndex(p => p.id === currentDealerId);
       
-      // Update dealer flags
       const playersWithDealer = newOrder.map((p, i) => ({
         ...p,
         isDealer: i === newDealerIndex,
@@ -311,7 +377,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     return gameState.players[gameState.currentDealerIndex];
   }, [gameState]);
 
-  const canUndo = (gameState?.rounds.length ?? 0) > 0;
+  const canUndo = (gameState?.hands.length ?? 0) > 0;
   const canRedo = redoStack.length > 0;
 
   return (
@@ -319,11 +385,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       value={{
         gameState,
         createGame,
-        startBidding,
-        submitBid,
-        submitRoundResult,
-        undoLastRound,
-        redoRound,
+        setStarterCard,
+        submitPeggingScores,
+        submitHandScore,
+        submitCribScore,
+        finishHand,
+        undoLastHand,
+        redoHand,
         resetGame,
         reorderPlayers,
         getPlayer,

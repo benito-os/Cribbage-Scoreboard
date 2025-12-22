@@ -8,22 +8,22 @@ import { useGame } from "@/lib/gameContext";
 import { usePlayerProfiles } from "@/lib/playerProfilesContext";
 import { getTargetScore } from "@shared/schema";
 import { PlayerComboInput } from "@/components/player-combo-input";
-import { Users, CircleDot, Play, Flame, History, UserCog } from "lucide-react";
+import { Users, CircleDot, Play, History, UserCog } from "lucide-react";
+import { SiCrunchbase } from "react-icons/si";
 
 export default function GameSetup() {
   const { createGame, gameState } = useGame();
   const { getOrCreateProfile, gameHistory } = usePlayerProfiles();
   const [, setLocation] = useLocation();
 
-  const [playerCount, setPlayerCount] = useState<3 | 4>(4);
+  const [playerCount, setPlayerCount] = useState<2 | 3 | 4>(2);
   const [playerNames, setPlayerNames] = useState<string[]>(["", "", "", ""]);
   const [dealerIndex, setDealerIndex] = useState<number>(0);
 
-  // If there's an existing game, offer to resume
   const hasExistingGame = gameState !== null && gameState.gamePhase !== "complete";
 
   const handlePlayerCountChange = (value: string) => {
-    const count = parseInt(value) as 3 | 4;
+    const count = parseInt(value) as 2 | 3 | 4;
     setPlayerCount(count);
     if (dealerIndex >= count) {
       setDealerIndex(0);
@@ -40,7 +40,6 @@ export default function GameSetup() {
     const names = playerNames.slice(0, playerCount);
     const validNames = names.map((name, i) => name.trim() || `Player ${i + 1}`);
     
-    // Create or get profiles for each player and get their IDs
     const playerInputs = validNames.map(name => {
       const profile = getOrCreateProfile(name);
       return { name, profileId: profile.id };
@@ -54,20 +53,20 @@ export default function GameSetup() {
     setLocation("/game");
   };
 
-  const targetScore = getTargetScore(playerCount);
-  const canStart = true; // Names default to "Player X" if empty
+  const targetScore = getTargetScore();
 
   return (
     <div className="min-h-screen">
       <div className="max-w-lg mx-auto px-4 py-8">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-            <Flame className="h-8 w-8 text-primary" />
+            <svg viewBox="0 0 24 24" className="h-8 w-8 text-primary" fill="currentColor">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l4.59-4.58L18 11l-6 6z"/>
+            </svg>
           </div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Pepper</h1>
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Cribbage</h1>
           <p className="text-muted-foreground">
-            The classic Hanson family game
+            The classic card game scorekeeper
           </p>
           <div className="flex justify-center gap-2 mt-4">
             <Link href="/players">
@@ -85,14 +84,13 @@ export default function GameSetup() {
           </div>
         </div>
 
-        {/* Resume Existing Game */}
         {hasExistingGame && (
           <Card className="p-4 mb-6 border-primary">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h3 className="font-semibold">Game in Progress</h3>
                 <p className="text-sm text-muted-foreground">
-                  Round {gameState.rounds.length + 1} • {gameState.playerCount} players
+                  Hand {gameState.hands.length + 1} • {gameState.playerCount} players
                 </p>
               </div>
               <Button onClick={handleResumeGame} data-testid="button-resume-game">
@@ -102,11 +100,9 @@ export default function GameSetup() {
           </Card>
         )}
 
-        {/* Setup Form */}
         <Card className="p-6 space-y-6">
           <h2 className="text-xl font-semibold">New Game Setup</h2>
 
-          {/* Player Count */}
           <div className="space-y-3">
             <Label className="flex items-center gap-2 text-base">
               <Users className="h-4 w-4" />
@@ -115,24 +111,29 @@ export default function GameSetup() {
             <RadioGroup
               value={playerCount.toString()}
               onValueChange={handlePlayerCountChange}
-              className="flex gap-4"
+              className="flex flex-wrap gap-4"
             >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="2" id="players-2" data-testid="radio-players-2" />
+                <Label htmlFor="players-2" className="cursor-pointer">
+                  2 Players
+                </Label>
+              </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="3" id="players-3" data-testid="radio-players-3" />
                 <Label htmlFor="players-3" className="cursor-pointer">
-                  3 Players (32 pts)
+                  3 Players
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="4" id="players-4" data-testid="radio-players-4" />
                 <Label htmlFor="players-4" className="cursor-pointer">
-                  4 Players (25 pts)
+                  4 Players
                 </Label>
               </div>
             </RadioGroup>
           </div>
 
-          {/* Player Names */}
           <div className="space-y-3">
             <Label className="text-base">Player Names</Label>
             <p className="text-xs text-muted-foreground -mt-1">
@@ -153,7 +154,7 @@ export default function GameSetup() {
                     variant={dealerIndex === index ? "default" : "outline"}
                     size="icon"
                     onClick={() => setDealerIndex(index)}
-                    title="Set as dealer"
+                    title="Set as first dealer"
                     data-testid={`button-dealer-${index}`}
                   >
                     <CircleDot className="h-4 w-4" />
@@ -166,26 +167,23 @@ export default function GameSetup() {
             </p>
           </div>
 
-          {/* Game Info */}
           <div className="bg-muted/50 rounded-lg p-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Target Score</span>
               <span className="font-medium">{targetScore} points</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Max Bid</span>
-              <span className="font-medium">{playerCount === 3 ? "8" : "6"}</span>
+              <span className="text-muted-foreground">Skunk Line</span>
+              <span className="font-medium">91 points</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Pepper Bid</span>
-              <span className="font-medium">{playerCount === 3 ? "9" : "7"}</span>
+              <span className="text-muted-foreground">Double Skunk</span>
+              <span className="font-medium">61 points</span>
             </div>
           </div>
 
-          {/* Start Button */}
           <Button
             onClick={handleStartGame}
-            disabled={!canStart}
             className="w-full h-12 text-lg gap-2"
             data-testid="button-start-game"
           >

@@ -1,7 +1,8 @@
 import { useEffect, useCallback } from "react";
 import { useGame } from "@/lib/gameContext";
 import { usePlayerProfiles } from "@/lib/playerProfilesContext";
-import type { GameState, Round } from "@shared/schema";
+import type { GameState, HandResult } from "@shared/schema";
+import { getSkunkStatus } from "@shared/schema";
 
 export function useGameCompletion() {
   const { setOnGameComplete } = useGame();
@@ -9,13 +10,14 @@ export function useGameCompletion() {
 
   const handleGameComplete = useCallback((completedGame: GameState | null) => {
     if (!completedGame) return;
-    const { players, rounds, winnerId, playerCount, targetScore } = completedGame;
+    const { players, hands, winnerId, playerCount, targetScore } = completedGame;
 
-    // Find winner details
     const winner = players.find(p => p.id === winnerId);
     const winnerProfile = winner?.profileId;
 
-    // Save to game history
+    const lowestScore = Math.min(...players.filter(p => p.id !== winnerId).map(p => p.score));
+    const skunkStatus = winner ? getSkunkStatus(winner.score, lowestScore) : "none";
+
     addCompletedGame({
       playerCount,
       targetScore,
@@ -24,33 +26,34 @@ export function useGameCompletion() {
         name: p.name,
         finalScore: p.score,
       })),
-      rounds,
+      hands,
       winnerId: winnerProfile,
       winnerName: winner?.name ?? "Unknown",
-      totalRounds: rounds.length,
+      totalHands: hands.length,
+      skunkStatus,
     });
 
-    // Update stats for each player
     players.forEach(player => {
       if (!player.profileId) return;
 
-      // Process each round for this player (updatePlayerStats is designed for per-round calls)
-      rounds.forEach((round: Round) => {
-        const wasBidder = round.bidderId === player.id;
-        const tricksWon = round.playerTricks[player.id] ?? 0;
-        const wasPepper = wasBidder && round.bidType === "pepper";
+      hands.forEach((hand: HandResult) => {
+        const handEntry = hand.handScores.find(s => s.playerId === player.id);
+        const handScore = handEntry?.points ?? 0;
+        const wasDealer = hand.dealerId === player.id;
 
         updatePlayerStats(player.profileId!, {
-          won: player.id === winnerId,
-          wasBidder,
-          bidSuccess: wasBidder ? round.bidSuccess : undefined,
-          wasPepper,
-          tricksWon,
+          handScore,
+          wasDealer,
         });
       });
 
-      // Record game end once per player (gamesPlayed, gamesWon)
-      recordGameEnd(player.profileId, player.id === winnerId);
+      const wasSkunk = skunkStatus === "skunk" || skunkStatus === "doubleSkunk";
+      recordGameEnd(
+        player.profileId, 
+        player.id === winnerId,
+        skunkStatus === "skunk",
+        skunkStatus === "doubleSkunk"
+      );
     });
   }, [addCompletedGame, updatePlayerStats, recordGameEnd]);
 

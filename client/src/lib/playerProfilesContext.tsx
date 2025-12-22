@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import type { PlayerProfile, CompletedGame } from "@shared/schema";
 
-const PROFILES_STORAGE_KEY = "pepper-player-profiles";
-const HISTORY_STORAGE_KEY = "pepper-game-history";
+const PROFILES_STORAGE_KEY = "cribbage-player-profiles";
+const HISTORY_STORAGE_KEY = "cribbage-game-history";
 
 interface PlayerProfilesContextType {
   profiles: PlayerProfile[];
@@ -14,14 +14,11 @@ interface PlayerProfilesContextType {
   getProfileByName: (name: string) => PlayerProfile | undefined;
   getOrCreateProfile: (name: string) => PlayerProfile;
   addCompletedGame: (game: Omit<CompletedGame, "id" | "completedAt">) => void;
-  updatePlayerStats: (profileId: string, roundData: {
-    won: boolean;
-    wasBidder: boolean;
-    bidSuccess?: boolean;
-    wasPepper?: boolean;
-    tricksWon: number;
+  updatePlayerStats: (profileId: string, handData: {
+    handScore: number;
+    wasDealer: boolean;
   }) => void;
-  recordGameEnd: (profileId: string, won: boolean) => void;
+  recordGameEnd: (profileId: string, won: boolean, wasSkunk?: boolean, wasDoubleSkunk?: boolean) => void;
 }
 
 const PlayerProfilesContext = createContext<PlayerProfilesContextType | null>(null);
@@ -83,12 +80,12 @@ export function PlayerProfilesProvider({ children }: { children: ReactNode }) {
       stats: {
         gamesPlayed: 0,
         gamesWon: 0,
-        totalRounds: 0,
-        bidsWon: 0,
-        bidsLost: 0,
-        pepperAttempts: 0,
-        pepperSuccesses: 0,
-        totalTricksWon: 0,
+        totalHands: 0,
+        totalPoints: 0,
+        highestHandScore: 0,
+        skunksDealt: 0,
+        skunksReceived: 0,
+        perfectHands: 0,
       },
     };
     setProfiles(prev => [...prev, newProfile]);
@@ -115,12 +112,15 @@ export function PlayerProfilesProvider({ children }: { children: ReactNode }) {
       const mergedStats = {
         gamesPlayed: (keepProfile.stats?.gamesPlayed ?? 0) + (mergeProfile.stats?.gamesPlayed ?? 0),
         gamesWon: (keepProfile.stats?.gamesWon ?? 0) + (mergeProfile.stats?.gamesWon ?? 0),
-        totalRounds: (keepProfile.stats?.totalRounds ?? 0) + (mergeProfile.stats?.totalRounds ?? 0),
-        bidsWon: (keepProfile.stats?.bidsWon ?? 0) + (mergeProfile.stats?.bidsWon ?? 0),
-        bidsLost: (keepProfile.stats?.bidsLost ?? 0) + (mergeProfile.stats?.bidsLost ?? 0),
-        pepperAttempts: (keepProfile.stats?.pepperAttempts ?? 0) + (mergeProfile.stats?.pepperAttempts ?? 0),
-        pepperSuccesses: (keepProfile.stats?.pepperSuccesses ?? 0) + (mergeProfile.stats?.pepperSuccesses ?? 0),
-        totalTricksWon: (keepProfile.stats?.totalTricksWon ?? 0) + (mergeProfile.stats?.totalTricksWon ?? 0),
+        totalHands: (keepProfile.stats?.totalHands ?? 0) + (mergeProfile.stats?.totalHands ?? 0),
+        totalPoints: (keepProfile.stats?.totalPoints ?? 0) + (mergeProfile.stats?.totalPoints ?? 0),
+        highestHandScore: Math.max(
+          keepProfile.stats?.highestHandScore ?? 0,
+          mergeProfile.stats?.highestHandScore ?? 0
+        ),
+        skunksDealt: (keepProfile.stats?.skunksDealt ?? 0) + (mergeProfile.stats?.skunksDealt ?? 0),
+        skunksReceived: (keepProfile.stats?.skunksReceived ?? 0) + (mergeProfile.stats?.skunksReceived ?? 0),
+        perfectHands: (keepProfile.stats?.perfectHands ?? 0) + (mergeProfile.stats?.perfectHands ?? 0),
       };
 
       return prev
@@ -149,12 +149,9 @@ export function PlayerProfilesProvider({ children }: { children: ReactNode }) {
     setGameHistory(prev => [...prev, completedGame]);
   }, []);
 
-  const updatePlayerStats = useCallback((profileId: string, roundData: {
-    won: boolean;
-    wasBidder: boolean;
-    bidSuccess?: boolean;
-    wasPepper?: boolean;
-    tricksWon: number;
+  const updatePlayerStats = useCallback((profileId: string, handData: {
+    handScore: number;
+    wasDealer: boolean;
   }) => {
     setProfiles(prev => prev.map(p => {
       if (p.id !== profileId) return p;
@@ -162,42 +159,40 @@ export function PlayerProfilesProvider({ children }: { children: ReactNode }) {
       const stats = p.stats ?? {
         gamesPlayed: 0,
         gamesWon: 0,
-        totalRounds: 0,
-        bidsWon: 0,
-        bidsLost: 0,
-        pepperAttempts: 0,
-        pepperSuccesses: 0,
-        totalTricksWon: 0,
+        totalHands: 0,
+        totalPoints: 0,
+        highestHandScore: 0,
+        skunksDealt: 0,
+        skunksReceived: 0,
+        perfectHands: 0,
       };
 
       return {
         ...p,
         stats: {
           ...stats,
-          totalRounds: stats.totalRounds + 1,
-          totalTricksWon: stats.totalTricksWon + roundData.tricksWon,
-          bidsWon: stats.bidsWon + (roundData.wasBidder && roundData.bidSuccess ? 1 : 0),
-          bidsLost: stats.bidsLost + (roundData.wasBidder && !roundData.bidSuccess ? 1 : 0),
-          pepperAttempts: stats.pepperAttempts + (roundData.wasPepper ? 1 : 0),
-          pepperSuccesses: stats.pepperSuccesses + (roundData.wasPepper && roundData.bidSuccess ? 1 : 0),
+          totalHands: stats.totalHands + 1,
+          totalPoints: stats.totalPoints + handData.handScore,
+          highestHandScore: Math.max(stats.highestHandScore, handData.handScore),
+          perfectHands: stats.perfectHands + (handData.handScore === 29 ? 1 : 0),
         },
       };
     }));
   }, []);
 
-  const recordGameEnd = useCallback((profileId: string, won: boolean) => {
+  const recordGameEnd = useCallback((profileId: string, won: boolean, wasSkunk?: boolean, wasDoubleSkunk?: boolean) => {
     setProfiles(prev => prev.map(p => {
       if (p.id !== profileId) return p;
       
       const stats = p.stats ?? {
         gamesPlayed: 0,
         gamesWon: 0,
-        totalRounds: 0,
-        bidsWon: 0,
-        bidsLost: 0,
-        pepperAttempts: 0,
-        pepperSuccesses: 0,
-        totalTricksWon: 0,
+        totalHands: 0,
+        totalPoints: 0,
+        highestHandScore: 0,
+        skunksDealt: 0,
+        skunksReceived: 0,
+        perfectHands: 0,
       };
 
       return {
@@ -206,6 +201,8 @@ export function PlayerProfilesProvider({ children }: { children: ReactNode }) {
           ...stats,
           gamesPlayed: stats.gamesPlayed + 1,
           gamesWon: stats.gamesWon + (won ? 1 : 0),
+          skunksDealt: stats.skunksDealt + (won && (wasSkunk || wasDoubleSkunk) ? 1 : 0),
+          skunksReceived: stats.skunksReceived + (!won && (wasSkunk || wasDoubleSkunk) ? 1 : 0),
         },
       };
     }));

@@ -1,32 +1,30 @@
-import type { TrumpSuit } from "@shared/schema";
+import type { Suit } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 interface SuitIconProps {
-  suit: TrumpSuit;
+  suit: Suit;
   size?: "sm" | "md" | "lg";
   className?: string;
 }
 
-const suitSymbols: Record<TrumpSuit, string> = {
+const suitSymbols: Record<Suit, string> = {
   spades: "\u2660",
   hearts: "\u2665",
   diamonds: "\u2666",
   clubs: "\u2663",
-  none: "N",
 };
 
-const suitColors: Record<TrumpSuit, string> = {
+const suitColors: Record<Suit, string> = {
   spades: "text-foreground",
   hearts: "text-red-500 dark:text-red-400",
   diamonds: "text-red-500 dark:text-red-400",
   clubs: "text-foreground",
-  none: "text-muted-foreground",
 };
 
 const suitSizes: Record<"sm" | "md" | "lg", string> = {
-  sm: "text-lg",
-  md: "text-2xl",
-  lg: "text-4xl",
+  sm: "text-sm",
+  md: "text-lg",
+  lg: "text-2xl",
 };
 
 export function SuitIcon({ suit, size = "md", className }: SuitIconProps) {
@@ -46,15 +44,12 @@ export function SuitIcon({ suit, size = "md", className }: SuitIconProps) {
 }
 
 interface SuitSelectorProps {
-  selected: TrumpSuit | null;
-  onSelect: (suit: TrumpSuit) => void;
-  showNoTrump?: boolean;
+  selected: Suit | null;
+  onSelect: (suit: Suit) => void;
 }
 
-export function SuitSelector({ selected, onSelect, showNoTrump = false }: SuitSelectorProps) {
-  const suits: TrumpSuit[] = showNoTrump 
-    ? ["spades", "hearts", "diamonds", "clubs", "none"]
-    : ["spades", "hearts", "diamonds", "clubs"];
+export function SuitSelector({ selected, onSelect }: SuitSelectorProps) {
+  const suits: Suit[] = ["spades", "hearts", "diamonds", "clubs"];
 
   return (
     <div className="flex flex-wrap gap-2 justify-center">
@@ -65,7 +60,7 @@ export function SuitSelector({ selected, onSelect, showNoTrump = false }: SuitSe
           onClick={() => onSelect(suit)}
           data-testid={`button-suit-${suit}`}
           className={cn(
-            "w-14 h-14 rounded-md border-2 flex items-center justify-center transition-all",
+            "w-10 h-10 rounded-md border-2 flex items-center justify-center transition-all",
             selected === suit
               ? "border-primary bg-primary/10"
               : "border-border hover-elevate active-elevate-2"

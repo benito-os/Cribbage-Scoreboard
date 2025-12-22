@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePlayerProfiles } from "@/lib/playerProfilesContext";
-import { ArrowLeft, Users, Merge, Trash2, Plus, Trophy, Target } from "lucide-react";
+import { ArrowLeft, Users, Merge, Trash2, Plus, Trophy, Target, Star, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function ManagePlayers() {
@@ -218,9 +218,9 @@ export default function ManagePlayers() {
                 const winRate = profile.stats?.gamesPlayed 
                   ? Math.round((profile.stats.gamesWon / profile.stats.gamesPlayed) * 100)
                   : 0;
-                const bidSuccessRate = (profile.stats?.bidsWon ?? 0) + (profile.stats?.bidsLost ?? 0) > 0
-                  ? Math.round((profile.stats!.bidsWon / (profile.stats!.bidsWon + profile.stats!.bidsLost)) * 100)
-                  : 0;
+                const avgHandScore = profile.stats?.totalHands 
+                  ? (profile.stats.totalPoints / profile.stats.totalHands).toFixed(1)
+                  : "0";
 
                 return (
                   <Card key={profile.id} className="p-4" data-testid={`card-player-${profile.id}`}>
@@ -242,13 +242,20 @@ export default function ManagePlayers() {
                             </Badge>
                           )}
                         </div>
-                        {(profile.stats?.totalRounds ?? 0) > 0 && (
+                        {(profile.stats?.totalHands ?? 0) > 0 && (
                           <div className="text-xs text-muted-foreground mt-2 space-x-3">
-                            <span>{profile.stats?.totalRounds} rounds</span>
-                            <span>{bidSuccessRate}% bid success</span>
-                            {(profile.stats?.pepperAttempts ?? 0) > 0 && (
-                              <span>
-                                {profile.stats?.pepperSuccesses}/{profile.stats?.pepperAttempts} peppers
+                            <span>{profile.stats?.totalHands} hands</span>
+                            <span>Avg: {avgHandScore} pts/hand</span>
+                            {(profile.stats?.highestHandScore ?? 0) > 0 && (
+                              <span className="inline-flex items-center gap-0.5">
+                                <Star className="h-3 w-3" />
+                                Best: {profile.stats?.highestHandScore}
+                              </span>
+                            )}
+                            {(profile.stats?.perfectHands ?? 0) > 0 && (
+                              <span className="inline-flex items-center gap-0.5">
+                                <Zap className="h-3 w-3 text-amber-500" />
+                                {profile.stats?.perfectHands} perfect 29s
                               </span>
                             )}
                           </div>

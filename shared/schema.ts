@@ -1,12 +1,35 @@
 import { z } from "zod";
 
-// Trump suit options
-export const trumpSuits = ["spades", "hearts", "diamonds", "clubs", "none"] as const;
-export type TrumpSuit = typeof trumpSuits[number];
+// Card suits
+export const suits = ["spades", "hearts", "diamonds", "clubs"] as const;
+export type Suit = typeof suits[number];
 
-// Bid types (pepperNo removed - any bid can be no trump now)
-export const bidTypes = ["standard", "pepper"] as const;
-export type BidType = typeof bidTypes[number];
+// Card ranks (A=1, 2-10, J=11, Q=12, K=13)
+export const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"] as const;
+export type Rank = typeof ranks[number];
+
+// Card representation
+export const cardSchema = z.object({
+  rank: z.enum(ranks),
+  suit: z.enum(suits),
+});
+export type Card = z.infer<typeof cardSchema>;
+
+// Score breakdown item - explains each scoring component
+export const scoreBreakdownItemSchema = z.object({
+  type: z.enum(["fifteen", "pair", "threeOfKind", "fourOfKind", "run", "flush", "nobs"]),
+  points: z.number(),
+  cards: z.array(cardSchema),
+  description: z.string(),
+});
+export type ScoreBreakdownItem = z.infer<typeof scoreBreakdownItemSchema>;
+
+// Full score breakdown
+export const scoreBreakdownSchema = z.object({
+  items: z.array(scoreBreakdownItemSchema),
+  total: z.number(),
+});
+export type ScoreBreakdown = z.infer<typeof scoreBreakdownSchema>;
 
 // Player schema
 export const playerSchema = z.object({
@@ -14,56 +37,55 @@ export const playerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   score: z.number().default(0),
   isDealer: z.boolean().default(false),
-  profileId: z.string().optional(), // Links to persistent PlayerProfile
+  profileId: z.string().optional(),
 });
 
 export type Player = z.infer<typeof playerSchema>;
 export type InsertPlayer = Omit<Player, "id" | "score" | "isDealer"> & { isDealer?: boolean; profileId?: string };
 
-// Player tricks for a round - maps playerId to tricks won
-export const playerTricksSchema = z.record(z.string(), z.number());
-export type PlayerTricks = z.infer<typeof playerTricksSchema>;
-
-// Player participation status - maps playerId to play/fold
-export const playerParticipationSchema = z.record(z.string(), z.enum(["play", "fold"]));
-export type PlayerParticipation = z.infer<typeof playerParticipationSchema>;
-
-// Score changes for a round - maps playerId to score change
-export const scoreChangesSchema = z.record(z.string(), z.number());
-export type ScoreChanges = z.infer<typeof scoreChangesSchema>;
-
-// Round result schema
-export const roundSchema = z.object({
-  id: z.string(),
-  roundNumber: z.number(),
-  dealerId: z.string(),
-  bidderId: z.string(),
-  bidAmount: z.number(),
-  bidType: z.enum(bidTypes),
-  trumpSuit: z.enum(trumpSuits),
-  playerTricks: playerTricksSchema, // Tricks won by each player
-  playerParticipation: playerParticipationSchema.optional(), // play/fold status for each player
-  bidSuccess: z.boolean(),
-  scoreChanges: scoreChangesSchema, // Score change for each player
+// Score entry for a hand or crib
+export const scoreEntrySchema = z.object({
+  playerId: z.string(),
+  points: z.number(),
+  entryMode: z.enum(["manual", "calculated"]),
+  cards: z.array(cardSchema).optional(),
+  starterCard: cardSchema.optional(),
+  breakdown: scoreBreakdownSchema.optional(),
+  wasEdited: z.boolean().default(false),
 });
+export type ScoreEntry = z.infer<typeof scoreEntrySchema>;
 
-export type Round = z.infer<typeof roundSchema>;
-export type InsertRound = Omit<Round, "id">;
+// Hand result - a complete hand (deal) in cribbage
+export const handResultSchema = z.object({
+  id: z.string(),
+  handNumber: z.number(),
+  dealerId: z.string(),
+  starterCard: cardSchema.optional(),
+  peggingScores: z.record(z.string(), z.number()), // Points earned during play phase
+  handScores: z.array(scoreEntrySchema), // Each player's hand score
+  cribScore: scoreEntrySchema.optional(), // Dealer's crib score
+  scoreChanges: z.record(z.string(), z.number()), // Total score change per player this hand
+});
+export type HandResult = z.infer<typeof handResultSchema>;
+
+// Game phases for Cribbage
+export const gamePhases = ["setup", "pegging", "counting", "complete"] as const;
+export type GamePhase = typeof gamePhases[number];
 
 // Game state schema
 export const gameStateSchema = z.object({
   id: z.string(),
-  playerCount: z.union([z.literal(3), z.literal(4)]),
-  targetScore: z.number(),
+  playerCount: z.union([z.literal(2), z.literal(3), z.literal(4)]),
+  targetScore: z.number().default(121),
   players: z.array(playerSchema),
-  rounds: z.array(roundSchema),
+  hands: z.array(handResultSchema),
   currentDealerIndex: z.number().default(0),
-  gamePhase: z.enum(["setup", "bidding", "playing", "scoring", "complete"]),
-  currentBid: z.object({
-    bidderId: z.string().optional(),
-    amount: z.number().optional(),
-    type: z.enum(bidTypes).optional(),
-    trumpSuit: z.enum(trumpSuits).optional(),
+  gamePhase: z.enum(gamePhases),
+  currentHand: z.object({
+    starterCard: cardSchema.optional(),
+    peggingScores: z.record(z.string(), z.number()).optional(),
+    handScores: z.array(scoreEntrySchema).optional(),
+    cribScore: scoreEntrySchema.optional(),
   }).optional(),
   winnerId: z.string().optional(),
 });
@@ -72,111 +94,294 @@ export type GameState = z.infer<typeof gameStateSchema>;
 export type InsertGameState = Omit<GameState, "id">;
 
 // Helper functions
-export function getMaxBid(playerCount: 3 | 4): number {
-  return playerCount === 3 ? 8 : 6;
+export function getTargetScore(): number {
+  return 121;
 }
 
-export function getPepperBid(playerCount: 3 | 4): number {
-  return playerCount === 3 ? 9 : 7;
+export function getCardValue(rank: Rank): number {
+  if (rank === "A") return 1;
+  if (["J", "Q", "K"].includes(rank)) return 10;
+  return parseInt(rank);
 }
 
-export function getMaxTricks(playerCount: 3 | 4): number {
-  return playerCount === 3 ? 8 : 6;
+export function getRankOrder(rank: Rank): number {
+  return ranks.indexOf(rank) + 1;
 }
 
-export function getTargetScore(playerCount: 3 | 4): number {
-  return playerCount === 3 ? 32 : 25;
+export function cardToString(card: Card): string {
+  return `${card.rank}${card.suit[0].toUpperCase()}`;
 }
 
-// Calculate score changes for all players in a round
-// Bidder: max(bid, tricks) if successful, -bid if failed
-// Helpers (play with bidder): +1 per trick, OR -bid if 0 tricks
-// Folders: 0 points (neutral, sat out)
-// No Trump special rule: All players must participate - folding not allowed
-export function calculateAllScoreChanges(
-  bidderId: string,
-  bidAmount: number,
-  bidType: BidType,
-  playerTricks: PlayerTricks,
-  playerCount: 3 | 4,
-  trumpSuit?: TrumpSuit,
-  playerParticipation?: PlayerParticipation
-): { success: boolean; scoreChanges: ScoreChanges } {
-  // For Pepper bids, must take ALL tricks (maxTricks), not getPepperBid
-  // The bid value (7 or 9) is the scoring amount, not the trick requirement
-  const requiredTricks = bidType === "standard" ? bidAmount : getMaxTricks(playerCount);
-  const effectiveBid = bidType === "standard" ? bidAmount : getPepperBid(playerCount);
+export function cardsToString(cards: Card[]): string {
+  return cards.map(cardToString).join(", ");
+}
+
+// Calculate all combinations of cards that sum to 15
+function findFifteens(cards: Card[]): Card[][] {
+  const results: Card[][] = [];
+  const values = cards.map(c => getCardValue(c.rank));
   
-  const bidderTricks = playerTricks[bidderId] ?? 0;
-  const success = bidderTricks >= requiredTricks;
+  // Check all subsets of cards
+  for (let mask = 1; mask < (1 << cards.length); mask++) {
+    let sum = 0;
+    const subset: Card[] = [];
+    for (let i = 0; i < cards.length; i++) {
+      if (mask & (1 << i)) {
+        sum += values[i];
+        subset.push(cards[i]);
+      }
+    }
+    if (sum === 15) {
+      results.push(subset);
+    }
+  }
+  return results;
+}
+
+// Find all pairs (same rank)
+function findPairs(cards: Card[]): Card[][] {
+  const results: Card[][] = [];
+  for (let i = 0; i < cards.length; i++) {
+    for (let j = i + 1; j < cards.length; j++) {
+      if (cards[i].rank === cards[j].rank) {
+        results.push([cards[i], cards[j]]);
+      }
+    }
+  }
+  return results;
+}
+
+// Find all runs of 3 or more consecutive cards
+function findRuns(cards: Card[]): Card[][] {
+  const results: Card[][] = [];
   
-  const isNoTrump = trumpSuit === "none";
+  // Get unique ranks with their cards
+  const rankCards: Map<number, Card[]> = new Map();
+  for (const card of cards) {
+    const order = getRankOrder(card.rank);
+    if (!rankCards.has(order)) {
+      rankCards.set(order, []);
+    }
+    rankCards.get(order)!.push(card);
+  }
   
-  const scoreChanges: ScoreChanges = {};
+  // Find all consecutive sequences
+  const sortedRanks = Array.from(rankCards.keys()).sort((a, b) => a - b);
   
-  // Legacy data check: if no participation data provided, use old scoring rules
-  // (no fold penalty system - just +1 per trick for defenders)
-  const hasParticipationData = playerParticipation && Object.keys(playerParticipation).length > 0;
+  // Find runs and account for duplicates
+  function findConsecutiveRuns(startIdx: number): { length: number; endIdx: number } {
+    let length = 1;
+    let idx = startIdx;
+    while (idx < sortedRanks.length - 1 && sortedRanks[idx + 1] === sortedRanks[idx] + 1) {
+      length++;
+      idx++;
+    }
+    return { length, endIdx: idx };
+  }
   
-  for (const [playerId, tricks] of Object.entries(playerTricks)) {
-    if (playerId === bidderId) {
-      // Bidder: if successful, gets higher of bid or tricks won; if failed, loses bid amount
-      scoreChanges[playerId] = success ? Math.max(effectiveBid, tricks) : -effectiveBid;
+  // Generate all combinations of runs considering duplicates
+  function generateRunCombinations(rankSequence: number[]): Card[][] {
+    if (rankSequence.length < 3) return [];
+    
+    const cardOptions = rankSequence.map(rank => rankCards.get(rank)!);
+    const combinations: Card[][] = [];
+    
+    function combine(index: number, current: Card[]) {
+      if (index === cardOptions.length) {
+        combinations.push([...current]);
+        return;
+      }
+      for (const card of cardOptions[index]) {
+        current.push(card);
+        combine(index + 1, current);
+        current.pop();
+      }
+    }
+    
+    combine(0, []);
+    return combinations;
+  }
+  
+  // Find all valid runs
+  for (let i = 0; i < sortedRanks.length; i++) {
+    const { length, endIdx } = findConsecutiveRuns(i);
+    if (length >= 3) {
+      const rankSequence = sortedRanks.slice(i, endIdx + 1);
+      const runCombinations = generateRunCombinations(rankSequence);
+      results.push(...runCombinations);
+      i = endIdx; // Skip past this run
+    }
+  }
+  
+  return results;
+}
+
+// Check for flush (all same suit)
+function findFlush(handCards: Card[], starterCard?: Card, isCrib: boolean = false): Card[] | null {
+  if (handCards.length < 4) return null;
+  
+  const suit = handCards[0].suit;
+  const allHandSameSuit = handCards.every(c => c.suit === suit);
+  
+  if (!allHandSameSuit) return null;
+  
+  // For crib, must include starter to count
+  if (isCrib) {
+    if (starterCard && starterCard.suit === suit) {
+      return [...handCards, starterCard];
+    }
+    return null;
+  }
+  
+  // For regular hand, 4-card flush counts, 5 if starter matches
+  if (starterCard && starterCard.suit === suit) {
+    return [...handCards, starterCard];
+  }
+  
+  return handCards;
+}
+
+// Check for nobs (Jack in hand matching starter suit)
+function findNobs(handCards: Card[], starterCard?: Card): Card | null {
+  if (!starterCard) return null;
+  
+  for (const card of handCards) {
+    if (card.rank === "J" && card.suit === starterCard.suit) {
+      return card;
+    }
+  }
+  return null;
+}
+
+// Calculate the score breakdown for a hand
+export function calculateHandScore(
+  handCards: Card[],
+  starterCard?: Card,
+  isCrib: boolean = false
+): ScoreBreakdown {
+  const items: ScoreBreakdownItem[] = [];
+  const allCards = starterCard ? [...handCards, starterCard] : [...handCards];
+  
+  // Fifteens (2 points each)
+  const fifteens = findFifteens(allCards);
+  for (const cards of fifteens) {
+    items.push({
+      type: "fifteen",
+      points: 2,
+      cards,
+      description: `Fifteen for 2 (${cardsToString(cards)})`,
+    });
+  }
+  
+  // Pairs, three of a kind, four of a kind
+  const pairs = findPairs(allCards);
+  
+  // Group pairs by rank to detect three/four of a kind
+  const pairsByRank: Map<Rank, Card[][]> = new Map();
+  for (const pair of pairs) {
+    const rank = pair[0].rank;
+    if (!pairsByRank.has(rank)) {
+      pairsByRank.set(rank, []);
+    }
+    pairsByRank.get(rank)!.push(pair);
+  }
+  
+  for (const [rank, rankPairs] of pairsByRank) {
+    if (rankPairs.length === 6) {
+      // Four of a kind (6 pairs = 12 points)
+      const allCards = [...new Set(rankPairs.flat())];
+      items.push({
+        type: "fourOfKind",
+        points: 12,
+        cards: allCards,
+        description: `Four ${rank}s for 12`,
+      });
+    } else if (rankPairs.length === 3) {
+      // Three of a kind (3 pairs = 6 points)
+      const allCards = [...new Set(rankPairs.flat())];
+      items.push({
+        type: "threeOfKind",
+        points: 6,
+        cards: allCards,
+        description: `Three ${rank}s for 6`,
+      });
     } else {
-      // Check participation status
-      const participation = playerParticipation?.[playerId] ?? "play";
-      
-      if (participation === "fold") {
-        // Folded players get 0 points (neutral)
-        scoreChanges[playerId] = 0;
-      } else if (isNoTrump && tricks === 0) {
-        // No Trump: 0 tricks = lose bid value (everyone must participate)
-        scoreChanges[playerId] = -effectiveBid;
-      } else if (!isNoTrump && tricks === 0 && hasParticipationData) {
-        // With Trump + new rules: participating players with 0 tricks = lose bid value
-        // Only apply this penalty when participation data is explicitly provided
-        scoreChanges[playerId] = -effectiveBid;
-      } else {
-        // Normal: +1 per trick (or legacy mode without participation data)
-        scoreChanges[playerId] = tricks;
+      // Regular pairs (2 points each)
+      for (const pair of rankPairs) {
+        items.push({
+          type: "pair",
+          points: 2,
+          cards: pair,
+          description: `Pair of ${rank}s for 2`,
+        });
       }
     }
   }
   
-  return { success, scoreChanges };
+  // Runs (1 point per card)
+  const runs = findRuns(allCards);
+  for (const run of runs) {
+    items.push({
+      type: "run",
+      points: run.length,
+      cards: run,
+      description: `Run of ${run.length} for ${run.length} (${cardsToString(run)})`,
+    });
+  }
+  
+  // Flush
+  const flush = findFlush(handCards, starterCard, isCrib);
+  if (flush) {
+    items.push({
+      type: "flush",
+      points: flush.length,
+      cards: flush,
+      description: `Flush of ${flush.length} for ${flush.length}`,
+    });
+  }
+  
+  // Nobs
+  const nobs = findNobs(handCards, starterCard);
+  if (nobs) {
+    items.push({
+      type: "nobs",
+      points: 1,
+      cards: [nobs],
+      description: `Nobs (Jack of ${starterCard!.suit}) for 1`,
+    });
+  }
+  
+  const total = items.reduce((sum, item) => sum + item.points, 0);
+  
+  return { items, total };
 }
 
-// Legacy function for backward compatibility
-export function calculateScoreChange(
-  bidAmount: number,
-  bidType: BidType,
-  tricksWon: number,
-  playerCount: 3 | 4
-): { success: boolean; scoreChange: number } {
-  // For Pepper bids, must take ALL tricks (maxTricks)
-  const requiredTricks = bidType === "standard" ? bidAmount : getMaxTricks(playerCount);
-  const effectiveBid = bidType === "standard" ? bidAmount : getPepperBid(playerCount);
-  
-  const success = tricksWon >= requiredTricks;
-  const scoreChange = success ? effectiveBid : -effectiveBid;
-  
-  return { success, scoreChange };
+// Check for His Heels (Jack as starter = 2 points for dealer)
+export function checkHisHeels(starterCard: Card): boolean {
+  return starterCard.rank === "J";
+}
+
+// Calculate skunk status
+export function getSkunkStatus(winnerScore: number, loserScore: number): "none" | "skunk" | "doubleSkunk" {
+  if (loserScore < 61) return "doubleSkunk";
+  if (loserScore < 91) return "skunk";
+  return "none";
 }
 
 // Player Profile schema - persistent player identity with stats
 export const playerProfileSchema = z.object({
   id: z.string(),
   name: z.string().min(1, "Name is required"),
-  createdAt: z.string(), // ISO date string
+  createdAt: z.string(),
   stats: z.object({
     gamesPlayed: z.number().default(0),
     gamesWon: z.number().default(0),
-    totalRounds: z.number().default(0),
-    bidsWon: z.number().default(0),
-    bidsLost: z.number().default(0),
-    pepperAttempts: z.number().default(0),
-    pepperSuccesses: z.number().default(0),
-    totalTricksWon: z.number().default(0),
+    totalHands: z.number().default(0),
+    totalPoints: z.number().default(0),
+    highestHandScore: z.number().default(0),
+    skunksDealt: z.number().default(0),
+    skunksReceived: z.number().default(0),
+    perfectHands: z.number().default(0), // 29-point hands
   }).default({}),
 });
 
@@ -186,18 +391,19 @@ export type InsertPlayerProfile = Omit<PlayerProfile, "id" | "createdAt" | "stat
 // Completed game record for history
 export const completedGameSchema = z.object({
   id: z.string(),
-  completedAt: z.string(), // ISO date string
-  playerCount: z.union([z.literal(3), z.literal(4)]),
+  completedAt: z.string(),
+  playerCount: z.union([z.literal(2), z.literal(3), z.literal(4)]),
   targetScore: z.number(),
   players: z.array(z.object({
-    profileId: z.string().optional(), // links to PlayerProfile
+    profileId: z.string().optional(),
     name: z.string(),
     finalScore: z.number(),
   })),
-  winnerId: z.string().optional(), // profileId of winner
+  winnerId: z.string().optional(),
   winnerName: z.string(),
-  totalRounds: z.number(),
-  rounds: z.array(roundSchema),
+  totalHands: z.number(),
+  skunkStatus: z.enum(["none", "skunk", "doubleSkunk"]).optional(),
+  hands: z.array(handResultSchema),
 });
 
 export type CompletedGame = z.infer<typeof completedGameSchema>;

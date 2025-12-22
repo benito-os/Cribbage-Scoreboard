@@ -3,9 +3,8 @@ import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePlayerProfiles } from "@/lib/playerProfilesContext";
-import { ArrowLeft, Trophy, Calendar, Users, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Trophy, Calendar, Users, ChevronDown, ChevronUp, Zap } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +85,12 @@ export default function GameHistory() {
                             <div className="flex items-center gap-2 mb-1">
                               <Trophy className="h-4 w-4 text-primary" />
                               <span className="font-semibold">{game.winnerName}</span>
+                              {game.skunkStatus === "skunk" && (
+                                <Badge variant="secondary" className="text-xs">Skunk</Badge>
+                              )}
+                              {game.skunkStatus === "doubleSkunk" && (
+                                <Badge className="text-xs bg-amber-500">Double Skunk</Badge>
+                              )}
                             </div>
                             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                               <span className="flex items-center gap-1">
@@ -97,7 +102,7 @@ export default function GameHistory() {
                                 {game.playerCount} players
                               </span>
                               <Badge variant="secondary" className="text-xs">
-                                {game.totalRounds} rounds
+                                {game.totalHands} hands
                               </Badge>
                             </div>
                           </div>
