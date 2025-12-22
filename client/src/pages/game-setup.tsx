@@ -49,7 +49,7 @@ export default function GameSetup() {
   const canStart = true; // Names default to "Player X" if empty
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="max-w-lg mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">

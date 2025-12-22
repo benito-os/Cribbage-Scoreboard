@@ -118,7 +118,7 @@ export default function ActiveGame() {
   const lastRoundSummary = getLastRoundSummary();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen flex flex-col">
       {/* Compact Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="max-w-2xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
