@@ -55,7 +55,7 @@ export function useGameCompletion() {
   }, [addCompletedGame, updatePlayerStats, recordGameEnd]);
 
   useEffect(() => {
-    setOnGameComplete(handleGameComplete);
-    return () => setOnGameComplete(null);
+    setOnGameComplete(() => handleGameComplete);
+    return () => setOnGameComplete(() => null);
   }, [setOnGameComplete, handleGameComplete]);
 }
