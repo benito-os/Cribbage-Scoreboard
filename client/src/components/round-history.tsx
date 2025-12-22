@@ -37,13 +37,15 @@ export function RoundHistory({ rounds, players, maxHeight = "300px" }: RoundHist
     });
   };
 
-  // Get bidder's score change for display
+  // Get bidder's score change for display (with null safety for legacy data)
   const getBidderScoreChange = (round: Round) => {
+    if (!round.scoreChanges) return 0;
     return round.scoreChanges[round.bidderId] ?? 0;
   };
 
-  // Get bidder's tricks
+  // Get bidder's tricks (with null safety for legacy data)
   const getBidderTricks = (round: Round) => {
+    if (!round.playerTricks) return 0;
     return round.playerTricks[round.bidderId] ?? 0;
   };
 
@@ -134,8 +136,8 @@ export function RoundHistory({ rounds, players, maxHeight = "300px" }: RoundHist
                         All Players
                       </div>
                       {players.map(player => {
-                        const tricks = round.playerTricks[player.id] ?? 0;
-                        const scoreChange = round.scoreChanges[player.id] ?? 0;
+                        const tricks = round.playerTricks?.[player.id] ?? 0;
+                        const scoreChange = round.scoreChanges?.[player.id] ?? 0;
                         const isBidder = player.id === round.bidderId;
 
                         return (

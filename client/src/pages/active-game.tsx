@@ -31,6 +31,8 @@ import {
   Check,
   Flame,
   ArrowUpDown,
+  CircleDot,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,20 +44,19 @@ export default function ActiveGame() {
   const [showBidDialog, setShowBidDialog] = useState(false);
   const [showResultDialog, setShowResultDialog] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [showUndoConfirm, setShowUndoConfirm] = useState(false);
   const [showReorderDialog, setShowReorderDialog] = useState(false);
 
-  // Redirect to setup if no game
   if (!gameState) {
     setLocation("/");
     return null;
   }
 
-  const { players, targetScore, rounds, gamePhase, currentBid, winnerId, playerCount } =
+  const { players, targetScore, rounds, gamePhase, currentBid, winnerId, playerCount, currentDealerIndex } =
     gameState;
 
-  // Sort players by score for ranking
   const rankedPlayers = [...players].sort((a, b) => b.score - a.score);
+  const lastRound = rounds.length > 0 ? rounds[rounds.length - 1] : null;
+  const currentDealer = players[currentDealerIndex];
 
   const handleNewRound = () => {
     setShowBidDialog(true);
@@ -78,7 +79,6 @@ export default function ActiveGame() {
 
   const handleUndo = () => {
     undoLastRound();
-    setShowUndoConfirm(false);
   };
 
   const handleReset = () => {
@@ -105,11 +105,23 @@ export default function ActiveGame() {
     return `Bid ${currentBid.amount}`;
   };
 
+  const getLastRoundSummary = () => {
+    if (!lastRound) return null;
+    const bidder = players.find(p => p.id === lastRound.bidderId);
+    return {
+      bidder,
+      success: lastRound.bidSuccess,
+      scoreChanges: lastRound.scoreChanges,
+    };
+  };
+
+  const lastRoundSummary = getLastRoundSummary();
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Compact Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+        <div className="max-w-2xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -120,10 +132,11 @@ export default function ActiveGame() {
               <Home className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="font-semibold text-lg">Round {rounds.length + 1}</h1>
-              <p className="text-xs text-muted-foreground">
-                First to {targetScore} wins
-              </p>
+              <h1 className="font-semibold">Round {rounds.length + 1}</h1>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <CircleDot className="h-3 w-3" />
+                <span>{currentDealer?.name} deals</span>
+              </div>
             </div>
           </div>
 
@@ -132,7 +145,6 @@ export default function ActiveGame() {
               variant="ghost"
               size="icon"
               onClick={() => setShowReorderDialog(true)}
-              title="Reorder players"
               data-testid="button-reorder"
             >
               <ArrowUpDown className="h-5 w-5" />
@@ -141,7 +153,7 @@ export default function ActiveGame() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowUndoConfirm(true)}
+                onClick={handleUndo}
                 data-testid="button-undo"
               >
                 <Undo2 className="h-5 w-5" />
@@ -152,97 +164,141 @@ export default function ActiveGame() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* Winner Banner */}
-        {gamePhase === "complete" && winner && (
-          <Card className="p-6 text-center bg-primary/5 border-primary">
-            <Trophy className="h-12 w-12 text-primary mx-auto mb-3" />
-            <h2 className="text-2xl font-bold mb-1">{winner.name} Wins!</h2>
-            <p className="text-muted-foreground mb-4">
-              Final score: {winner.score} points
-            </p>
-            <Button onClick={handleNewGame} className="gap-2" data-testid="button-new-game">
-              <RotateCcw className="h-4 w-4" />
-              New Game
-            </Button>
-          </Card>
-        )}
+      {/* Main Content - scrollable */}
+      <main className="flex-1 overflow-y-auto pb-24">
+        <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+          {/* Winner Banner */}
+          {gamePhase === "complete" && winner && (
+            <Card className="p-6 text-center bg-primary/5 border-primary">
+              <Trophy className="h-12 w-12 text-primary mx-auto mb-3" />
+              <h2 className="text-2xl font-bold mb-1">{winner.name} Wins!</h2>
+              <p className="text-muted-foreground mb-4">
+                Final score: {winner.score} points
+              </p>
+              <Button onClick={handleNewGame} className="gap-2" data-testid="button-new-game">
+                <RotateCcw className="h-4 w-4" />
+                New Game
+              </Button>
+            </Card>
+          )}
 
-        {/* Current Bid Status */}
-        {gamePhase === "playing" && currentBid?.bidderId && (
-          <Card className="p-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-chart-4/10 flex items-center justify-center">
-                  <Flame className="h-5 w-5 text-chart-4" />
-                </div>
-                <div>
-                  <p className="font-medium">
-                    {players.find((p) => p.id === currentBid.bidderId)?.name}
-                  </p>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <span>{getBidLabel()}</span>
-                    {currentBid.trumpSuit && currentBid.trumpSuit !== "none" && (
-                      <SuitIcon suit={currentBid.trumpSuit} size="sm" />
-                    )}
+          {/* Last Round Summary - Inline compact display */}
+          {lastRoundSummary && gamePhase !== "complete" && (
+            <div className={cn(
+              "rounded-lg px-3 py-2 text-sm flex items-center justify-between gap-2 flex-wrap",
+              lastRoundSummary.success 
+                ? "bg-primary/10 text-primary" 
+                : "bg-destructive/10 text-destructive"
+            )}>
+              <div className="flex items-center gap-1.5">
+                {lastRoundSummary.success ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <X className="h-4 w-4" />
+                )}
+                <span className="font-medium">
+                  {lastRoundSummary.bidder?.name} {lastRoundSummary.success ? "made" : "missed"}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {players.map(p => {
+                  const change = lastRoundSummary.scoreChanges?.[p.id] ?? 0;
+                  if (change === 0) return null;
+                  return (
+                    <span key={p.id} className="text-foreground">
+                      {p.name.split(' ')[0]}: {change > 0 ? '+' : ''}{change}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Current Bid Status */}
+          {gamePhase === "playing" && currentBid?.bidderId && (
+            <Card className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-chart-4/10 flex items-center justify-center">
+                    <Flame className="h-5 w-5 text-chart-4" />
+                  </div>
+                  <div>
+                    <p className="font-medium">
+                      {players.find((p) => p.id === currentBid.bidderId)?.name}
+                    </p>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <span>{getBidLabel()}</span>
+                      {currentBid.trumpSuit && currentBid.trumpSuit !== "none" && (
+                        <SuitIcon suit={currentBid.trumpSuit} size="sm" />
+                      )}
+                    </div>
                   </div>
                 </div>
+                <Button
+                  onClick={() => setShowResultDialog(true)}
+                  className="gap-2"
+                  data-testid="button-enter-result"
+                >
+                  <Check className="h-4 w-4" />
+                  Enter Tricks
+                </Button>
               </div>
-              <Button
-                onClick={() => setShowResultDialog(true)}
-                className="gap-2"
-                data-testid="button-enter-result"
-              >
-                <Check className="h-4 w-4" />
-                Enter Result
-              </Button>
+            </Card>
+          )}
+
+          {/* Scoreboard */}
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-medium text-muted-foreground">Scores</h2>
+              <span className="text-xs text-muted-foreground">First to {targetScore}</span>
             </div>
-          </Card>
-        )}
+            <div
+              className={cn(
+                "grid gap-3",
+                playerCount === 3 ? "grid-cols-3" : "grid-cols-2"
+              )}
+            >
+              {rankedPlayers.map((player, index) => (
+                <PlayerScoreCard
+                  key={player.id}
+                  player={player}
+                  targetScore={targetScore}
+                  isCurrentBidder={currentBid?.bidderId === player.id}
+                  isWinner={winnerId === player.id}
+                  rank={index + 1}
+                />
+              ))}
+            </div>
+          </section>
 
-        {/* Scoreboard */}
-        <section>
-          <h2 className="text-lg font-semibold mb-3">Scoreboard</h2>
-          <div
-            className={cn(
-              "grid gap-4",
-              playerCount === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2"
-            )}
-          >
-            {rankedPlayers.map((player, index) => (
-              <PlayerScoreCard
-                key={player.id}
-                player={player}
-                targetScore={targetScore}
-                isCurrentBidder={currentBid?.bidderId === player.id}
-                isWinner={winnerId === player.id}
-                rank={index + 1}
+          {/* Round History - Collapsible */}
+          {rounds.length > 0 && (
+            <section>
+              <RoundHistory
+                rounds={rounds}
+                players={players}
+                maxHeight="300px"
               />
-            ))}
-          </div>
-        </section>
-
-        {/* Action Button */}
-        {gamePhase === "bidding" && (
-          <Button
-            onClick={handleNewRound}
-            className="w-full h-14 text-lg gap-2"
-            data-testid="button-new-round"
-          >
-            <Plus className="h-5 w-5" />
-            Enter Bid
-          </Button>
-        )}
-
-        {/* Round History */}
-        <section>
-          <RoundHistory
-            rounds={rounds}
-            players={players}
-            maxHeight="400px"
-          />
-        </section>
+            </section>
+          )}
+        </div>
       </main>
+
+      {/* Fixed Bottom Action Bar - Thumb zone */}
+      {gamePhase === "bidding" && (
+        <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t p-4 z-40">
+          <div className="max-w-2xl mx-auto">
+            <Button
+              onClick={handleNewRound}
+              className="w-full h-14 text-lg gap-2"
+              data-testid="button-new-round"
+            >
+              <Plus className="h-5 w-5" />
+              Enter Bid
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Dialogs */}
       <BidDialog
@@ -251,7 +307,7 @@ export default function ActiveGame() {
         onSubmit={handleBidSubmit}
         players={players}
         playerCount={playerCount}
-        currentDealerIndex={gameState.currentDealerIndex}
+        currentDealerIndex={currentDealerIndex}
       />
 
       <RoundResultDialog
@@ -268,30 +324,12 @@ export default function ActiveGame() {
         players={players}
       />
 
-      <AlertDialog open={showUndoConfirm} onOpenChange={setShowUndoConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Undo Last Round?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove the last round and restore the previous scores.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-undo-cancel">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleUndo} data-testid="button-undo-confirm">
-              Undo
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>End Current Game?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will end the current game and return to the setup screen. Your
-              game progress will be lost.
+              This will end the current game and return to setup.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
