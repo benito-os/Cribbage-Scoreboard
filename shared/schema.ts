@@ -84,15 +84,17 @@ export function getTargetScore(playerCount: 3 | 4): number {
 
 // Calculate score changes for all players in a round
 // Bidder: +bid if successful, -bid if failed
-// Defenders: +1 per trick won
+// Defenders: +1 per trick won (normal) OR -bid if 0 tricks (No Trump only)
 // Note: For Pepper bids, player must take ALL tricks (6 or 8) to succeed
 // The bid VALUE is higher (7 or 9) but required tricks = max tricks
+// No Trump special rule: All players must participate - 0 tricks = -bid value
 export function calculateAllScoreChanges(
   bidderId: string,
   bidAmount: number,
   bidType: BidType,
   playerTricks: PlayerTricks,
-  playerCount: 3 | 4
+  playerCount: 3 | 4,
+  trumpSuit?: TrumpSuit
 ): { success: boolean; scoreChanges: ScoreChanges } {
   // For Pepper bids, must take ALL tricks (maxTricks), not getPepperBid
   // The bid value (7 or 9) is the scoring amount, not the trick requirement
@@ -102,6 +104,8 @@ export function calculateAllScoreChanges(
   const bidderTricks = playerTricks[bidderId] ?? 0;
   const success = bidderTricks >= requiredTricks;
   
+  const isNoTrump = trumpSuit === "none";
+  
   const scoreChanges: ScoreChanges = {};
   
   for (const [playerId, tricks] of Object.entries(playerTricks)) {
@@ -109,8 +113,14 @@ export function calculateAllScoreChanges(
       // Bidder gets +/- bid amount
       scoreChanges[playerId] = success ? effectiveBid : -effectiveBid;
     } else {
-      // Defenders get +1 per trick
-      scoreChanges[playerId] = tricks;
+      // Defenders scoring depends on trump
+      if (isNoTrump && tricks === 0) {
+        // No Trump penalty: 0 tricks = lose bid value
+        scoreChanges[playerId] = -effectiveBid;
+      } else {
+        // Normal: +1 per trick
+        scoreChanges[playerId] = tricks;
+      }
     }
   }
   

@@ -107,7 +107,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         amount!,
         type!,
         playerTricks,
-        prev.playerCount
+        prev.playerCount,
+        trumpSuit
       );
 
       const newRound: Round = {

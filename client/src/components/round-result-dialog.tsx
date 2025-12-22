@@ -73,12 +73,15 @@ export function RoundResultDialog({
   const isValidTotal = totalTricks === maxTricks;
   const remaining = maxTricks - totalTricks;
 
+  const isNoTrump = currentBid.trumpSuit === "none";
+  
   const { success, scoreChanges } = calculateAllScoreChanges(
     currentBid.bidderId,
     currentBid.amount!,
     currentBid.type!,
     playerTricks,
-    playerCount
+    playerCount,
+    currentBid.trumpSuit
   );
 
   const incrementTricks = (playerId: string) => {
@@ -168,6 +171,15 @@ export function RoundResultDialog({
         </DialogHeader>
 
         <div className="space-y-3 py-2">
+          {/* No Trump warning */}
+          {isNoTrump && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-center">
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                No Trump: 0 tricks = -{bidAmount} penalty
+              </p>
+            </div>
+          )}
+          
           {/* Player Tricks - Large touch targets */}
           {players.map((player) => {
             const tricks = playerTricks[player.id] ?? 0;
