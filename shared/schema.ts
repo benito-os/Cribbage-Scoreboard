@@ -14,10 +14,11 @@ export const playerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   score: z.number().default(0),
   isDealer: z.boolean().default(false),
+  profileId: z.string().optional(), // Links to persistent PlayerProfile
 });
 
 export type Player = z.infer<typeof playerSchema>;
-export type InsertPlayer = Omit<Player, "id" | "score" | "isDealer"> & { isDealer?: boolean };
+export type InsertPlayer = Omit<Player, "id" | "score" | "isDealer"> & { isDealer?: boolean; profileId?: string };
 
 // Player tricks for a round - maps playerId to tricks won
 export const playerTricksSchema = z.record(z.string(), z.number());

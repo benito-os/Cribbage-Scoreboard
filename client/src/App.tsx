@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GameProvider } from "@/lib/gameContext";
 import { PlayerProfilesProvider } from "@/lib/playerProfilesContext";
+import { GameCompletionHandler } from "@/components/game-completion-handler";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemedBackground } from "@/components/themed-background";
 import GameSetup from "@/pages/game-setup";
@@ -33,6 +34,7 @@ function App() {
           <TooltipProvider>
             <PlayerProfilesProvider>
               <GameProvider>
+                <GameCompletionHandler />
                 <Toaster />
                 <Router />
               </GameProvider>

@@ -4,9 +4,14 @@ import { getTargetScore, calculateAllScoreChanges, getPepperBid } from "@shared/
 
 const STORAGE_KEY = "pepper-game-state";
 
+interface PlayerInput {
+  name: string;
+  profileId?: string;
+}
+
 interface GameContextType {
   gameState: GameState | null;
-  createGame: (playerCount: 3 | 4, playerNames: string[], dealerIndex: number) => void;
+  createGame: (playerCount: 3 | 4, players: PlayerInput[], dealerIndex: number) => void;
   startBidding: () => void;
   submitBid: (bidderId: string, amount: number, type: BidType, trumpSuit: TrumpSuit) => void;
   submitRoundResult: (playerTricks: PlayerTricks, playerParticipation?: PlayerParticipation) => void;
@@ -18,6 +23,8 @@ interface GameContextType {
   getCurrentDealer: () => Player | undefined;
   canUndo: boolean;
   canRedo: boolean;
+  onGameComplete: ((completedGame: GameState | null) => void) | null;
+  setOnGameComplete: (callback: ((completedGame: GameState | null) => void) | null) => void;
 }
 
 const GameContext = createContext<GameContextType | null>(null);
@@ -56,6 +63,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
     playerScores: Record<string, number>;
   }[]>([]);
 
+  // Callback for when game completes
+  const [onGameComplete, setOnGameComplete] = useState<((completedGame: GameState | null) => void) | null>(null);
+
+  // Track which game IDs have been processed for completion
+  const [processedGameIds, setProcessedGameIds] = useState<Set<string>>(new Set());
+
   // Persist state to localStorage
   useEffect(() => {
     if (gameState) {
@@ -63,12 +76,26 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [gameState]);
 
-  const createGame = useCallback((playerCount: 3 | 4, playerNames: string[], dealerIndex: number) => {
-    const players: Player[] = playerNames.map((name, index) => ({
+  // Detect game completion and trigger callback
+  useEffect(() => {
+    if (
+      gameState?.gamePhase === "complete" && 
+      gameState?.id && 
+      !processedGameIds.has(gameState.id) &&
+      onGameComplete
+    ) {
+      setProcessedGameIds(prev => new Set(Array.from(prev).concat(gameState.id)));
+      onGameComplete(gameState);
+    }
+  }, [gameState?.gamePhase, gameState?.id, processedGameIds, onGameComplete]);
+
+  const createGame = useCallback((playerCount: 3 | 4, playerInputs: PlayerInput[], dealerIndex: number) => {
+    const players: Player[] = playerInputs.map((input, index) => ({
       id: generateId(),
-      name,
+      name: input.name,
       score: 0,
       isDealer: index === dealerIndex,
+      profileId: input.profileId,
     }));
 
     const newGame: GameState = {
@@ -82,6 +109,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
     };
 
     setGameState(newGame);
+    // Clear redo stack and processed games for new game
+    setRedoStack([]);
+    setProcessedGameIds(new Set());
   }, []);
 
   const startBidding = useCallback(() => {
@@ -300,6 +330,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         getCurrentDealer,
         canUndo,
         canRedo,
+        onGameComplete,
+        setOnGameComplete,
       }}
     >
       {children}

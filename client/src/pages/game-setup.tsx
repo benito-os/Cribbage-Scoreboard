@@ -40,10 +40,13 @@ export default function GameSetup() {
     const names = playerNames.slice(0, playerCount);
     const validNames = names.map((name, i) => name.trim() || `Player ${i + 1}`);
     
-    // Create or get profiles for each player
-    validNames.forEach(name => getOrCreateProfile(name));
+    // Create or get profiles for each player and get their IDs
+    const playerInputs = validNames.map(name => {
+      const profile = getOrCreateProfile(name);
+      return { name, profileId: profile.id };
+    });
     
-    createGame(playerCount, validNames, dealerIndex);
+    createGame(playerCount, playerInputs, dealerIndex);
     setLocation("/game");
   };
 
